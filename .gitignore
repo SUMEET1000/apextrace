@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# FastF1 HTTP cache - regenerable, can grow to GBs
+data/raw_cache/
+
+.streamlit/secrets.toml
+.DS_Store

@@ -1,0 +1,11 @@
+# FastF1 3.8.x requires pandas<3. The base conda env on this machine has
+# pandas 3.0.2, which is why this project must run in its own venv.
+fastf1>=3.8,<4
+pandas>=2.2,<3
+numpy>=1.26,<3
+streamlit>=1.40
+plotly>=5.24
+statsmodels>=0.14
+scipy>=1.11
+pyarrow>=17
+pytest>=8
