@@ -54,6 +54,33 @@ def read_telemetry(key: SessionKey, n_points: int = GRID_POINTS) -> pd.DataFrame
     return decode_grid(raw, n_points=n_points)
 
 
+_TIMEDELTA_COLUMNS = (
+    "LapTime", "Sector1Time", "Sector2Time", "Sector3Time",
+    "PitInTime", "PitOutTime", "LapStartTime",
+)
+
+
+def read_laps(key: SessionKey) -> pd.DataFrame:
+    """Lap table with timedelta columns restored.
+
+    Parquet round-trips timedeltas poorly across engines, so the ETL flattens
+    them to float seconds. Restoring them here means the analysis modules see
+    one schema - the same one FastF1 produces - instead of every model having
+    to handle both.
+    """
+    laps = read_artefact(key, "laps")
+    if laps.empty:
+        return laps
+    out = laps.copy()
+    for col in _TIMEDELTA_COLUMNS:
+        seconds = f"{col}_s"
+        if seconds in out.columns:
+            out[col] = pd.to_timedelta(out[seconds], unit="s")
+    if "LapNumber" in out.columns:
+        out["LapNumber"] = out["LapNumber"].astype(float)
+    return out
+
+
 def get_lap(telemetry: pd.DataFrame, driver: str,
             lap_number: float | None = None) -> pd.DataFrame:
     """One driver's lap from a decoded telemetry frame.

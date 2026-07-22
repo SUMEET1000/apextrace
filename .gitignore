@@ -9,3 +9,4 @@ data/raw_cache/
 
 .streamlit/secrets.toml
 .DS_Store
+data/etl.log
