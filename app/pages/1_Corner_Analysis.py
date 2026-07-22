@@ -5,7 +5,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -129,9 +128,9 @@ with map_col:
         width="stretch", config=theme.PLOTLY_CONFIG,
     )
     caption(
-        f"Each point is a place on the lap, coloured by which driver is pulling "
-        f"away there — not by the running total, so one big corner does not "
-        f"stain the rest of the lap. Grey means neither driver is gaining."
+        "Each point is a place on the lap, coloured by which driver is pulling "
+        "away there — not by the running total, so one big corner does not "
+        "stain the rest of the lap. Grey means neither driver is gaining."
     )
 
 with list_col:

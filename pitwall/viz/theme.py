@@ -30,6 +30,8 @@ from __future__ import annotations
 import plotly.graph_objects as go
 import plotly.io as pio
 
+from pitwall.config import COMPOUND_COLOURS
+
 # --------------------------------------------------------------------------
 # Surfaces and ink
 # --------------------------------------------------------------------------
@@ -79,17 +81,8 @@ DIVERGING = [
 # Domain colours
 # --------------------------------------------------------------------------
 
-COMPOUND_COLOURS = {
-    "SOFT": "#E8484D",
-    "MEDIUM": "#F0C64B",
-    "HARD": "#EDEDED",
-    "INTERMEDIATE": "#43B02A",
-    "WET": "#3A82D8",
-    "UNKNOWN": "#7A7F87",
-}
-
-
 def compound_colour(compound: str) -> str:
+    """Official Pirelli colour for a compound. Defined once, in config."""
     return COMPOUND_COLOURS.get(str(compound).upper(), COMPOUND_COLOURS["UNKNOWN"])
 
 

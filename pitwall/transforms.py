@@ -278,7 +278,6 @@ def clean_laps(
 
     def _record(reason: str, mask_keep: pd.Series) -> pd.DataFrame:
         """Apply a keep-mask and record how many rows it removed."""
-        nonlocal df
         removed = int((~mask_keep).sum())
         if removed:
             reasons.append({"reason": reason, "count": removed})

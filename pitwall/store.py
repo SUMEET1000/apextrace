@@ -7,6 +7,7 @@ this importable from tests and notebooks.
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 from pitwall.config import GRID_POINTS, MANIFEST_PATH, PROCESSED_DIR
@@ -59,6 +60,10 @@ _TIMEDELTA_COLUMNS = (
     "PitInTime", "PitOutTime", "LapStartTime",
 )
 
+# Nothing in a session lasts a day. Anything beyond this is corruption, not
+# a duration.
+_MAX_DURATION_S = 86_400
+
 
 def read_laps(key: SessionKey) -> pd.DataFrame:
     """Lap table with timedelta columns restored.
@@ -75,7 +80,12 @@ def read_laps(key: SessionKey) -> pd.DataFrame:
     for col in _TIMEDELTA_COLUMNS:
         seconds = f"{col}_s"
         if seconds in out.columns:
-            out[col] = pd.to_timedelta(out[seconds], unit="s")
+            # Guard the conversion: a non-finite or absurd value would either
+            # overflow the nanosecond representation or, worse, silently
+            # become a plausible-looking duration.
+            values = pd.to_numeric(out[seconds], errors="coerce")
+            values = values.where(np.isfinite(values) & (values.abs() < _MAX_DURATION_S))
+            out[col] = pd.to_timedelta(values, unit="s")
     if "LapNumber" in out.columns:
         out["LapNumber"] = out["LapNumber"].astype(float)
     return out
