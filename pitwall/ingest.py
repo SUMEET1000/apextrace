@@ -69,6 +69,15 @@ def get_schedule(year: int) -> pd.DataFrame:
     return pd.DataFrame(sched)
 
 
+class RateLimited(RuntimeError):
+    """The F1 API's hourly request budget is exhausted.
+
+    Distinct from an ordinary load failure: no amount of retrying inside a
+    single run will clear it, so the caller should stop rather than burn
+    through the remaining sessions failing.
+    """
+
+
 def load_session(
     key: SessionKey,
     *,
@@ -76,11 +85,13 @@ def load_session(
     retries: int = 3,
     backoff_s: float = 20.0,
 ):
-    """Load a FastF1 session, retrying through rate limits.
+    """Load a FastF1 session, retrying transient failures.
 
-    The F1 API rate-limits aggressively during a bulk backfill, and a failure
-    partway through a 140-session run is expensive, so back off and retry
-    rather than aborting.
+    Rate limiting is handled differently from other errors. The F1 API caps
+    requests per hour, so a short backoff cannot clear it - a 60 s wait
+    against an hourly budget just fails again. Rate limits are raised as
+    :class:`RateLimited` for the caller to stop on; the dataset is resumable,
+    so the run can simply be restarted once the budget resets.
     """
     enable_cache()
     last_exc: Exception | None = None
@@ -95,11 +106,10 @@ def load_session(
             )
             return session
         except fastf1.RateLimitExceededError as exc:
-            last_exc = exc
-            wait = backoff_s * attempt
-            log.warning("rate limited on %s, waiting %.0fs (attempt %d/%d)",
-                        key, wait, attempt, retries)
-            time.sleep(wait)
+            raise RateLimited(
+                f"F1 API rate limit reached at {key}. The budget is hourly; "
+                f"re-run the same command later and it will resume from here."
+            ) from exc
         except Exception as exc:  # noqa: BLE001 - surfaced to the caller below
             last_exc = exc
             log.warning("load failed for %s: %s (attempt %d/%d)",

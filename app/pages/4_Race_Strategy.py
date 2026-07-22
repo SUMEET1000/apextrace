@@ -10,8 +10,10 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import brand  # noqa: E402
 from common import (  # noqa: E402
     caption,
+    load_artefact,
     fmt_laptime,
     load_laps,
     page_setup,
@@ -33,7 +35,8 @@ slug, meta = session_picker(key_prefix="strat")
 if slug is None:
     st.stop()
 
-session_header(meta)
+_track = load_artefact(slug, "trackmap")
+session_header(meta, "Race Strategy", track=_track)
 
 if meta["session"] != "R":
     st.info("Strategy analysis needs a **Race** session. Pick one in the sidebar.")
@@ -67,7 +70,7 @@ if not pace.empty:
               f"{fmt_laptime(pace['median_s'].iloc[0])} median", delta_color="off")
 c4.metric("Stints", len(stints_raw))
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- stints
 
@@ -79,7 +82,7 @@ caption(
     "the bottom."
 )
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- pace
 
@@ -109,7 +112,7 @@ with right:
         })
         st.dataframe(view, width="stretch", hide_index=True, height=430)
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- gaps
 
@@ -123,24 +126,20 @@ caption(
     "converging on zero is a driver closing in."
 )
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- undercut
 
 st.subheader("Undercut calculator")
 
-st.markdown(
-    f"<div style='background:{theme.PANEL};border-radius:10px;padding:14px 18px;"
-    f"color:{theme.INK_SECONDARY};line-height:1.6'>"
-    "<b style='color:#fff'>The pit loss cancels out, and that is the point.</b> "
-    "You box and immediately concede the pit loss; a few laps later your rival boxes "
-    "and concedes exactly the same. What is left is the time your fresher tyre took "
-    "out of them in between. Charging the driver the full pit loss — the intuitive "
-    "version — makes every undercut look impossible, because a ~20 s stop dwarfs any "
-    "tyre advantage. Pit loss still decides what traffic you rejoin into, but not "
-    "this comparison."
-    "</div>",
-    unsafe_allow_html=True,
+brand.verdict(
+    "<b>The pit loss cancels out, and that is the point.</b> "
+    "You box and immediately concede the pit loss; a few laps later your rival "
+    "boxes and concedes exactly the same. What is left is the time your fresher "
+    "tyre took out of them in between. Charging the driver the full pit loss — "
+    "the intuitive version — makes every undercut look impossible, because a "
+    "~20 s stop dwarfs any tyre advantage. Pit loss still decides what traffic "
+    "you rejoin into, but not this comparison."
 )
 st.write("")
 

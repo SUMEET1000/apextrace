@@ -10,6 +10,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import brand  # noqa: E402
 from common import (  # noqa: E402
     caption,
     driver_options,
@@ -33,13 +34,13 @@ slug, meta = session_picker(key_prefix="corner")
 if slug is None:
     st.stop()
 
-session_header(meta)
-
 telemetry = load_telemetry(slug)
 results = load_artefact(slug, "results")
 corners = load_artefact(slug, "corners")
 track = load_artefact(slug, "trackmap")
 segments = load_segments(slug)
+
+session_header(meta, "Corner Analysis", track=track)
 
 if telemetry.empty:
     st.warning("No telemetry stored for this session.")
@@ -56,7 +57,7 @@ params = st.query_params
 preset = [d for d in str(params.get("drivers", "")).split(",") if d in drivers]
 
 with st.sidebar:
-    st.markdown('<div class="pw-kicker">Comparison</div>', unsafe_allow_html=True)
+    brand.kicker("Comparison")
     name_a = st.selectbox("Reference", drivers,
                           index=drivers.index(preset[0]) if preset else 0)
     others = [d for d in drivers if d != name_a]
@@ -114,7 +115,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- map + biggest swings
 
@@ -135,11 +136,14 @@ with map_col:
 
 with list_col:
     st.subheader("Biggest swings")
+    # Same two hues as the track map beside it - blue where the compared
+    # driver is gaining, red where the reference is - so the list and the map
+    # can be read against each other without relearning the colours.
     for title, items, colour in (
-        (f"{name_b} gains most", summary["biggest_gains"], theme.SERIES[2]),
-        (f"{name_b} loses most", summary["biggest_losses"], theme.CMP_COLOUR),
+        (f"{name_b} gains most", summary["biggest_gains"], "#3987e5"),
+        (f"{name_b} loses most", summary["biggest_losses"], "#e66767"),
     ):
-        st.markdown(f"<div class='pw-kicker'>{title}</div>", unsafe_allow_html=True)
+        brand.kicker(title)
         if not items:
             st.markdown(f"<div style='color:{theme.INK_MUTED}'>—</div>",
                         unsafe_allow_html=True)
@@ -154,7 +158,7 @@ with list_col:
             )
         st.write("")
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- traces
 
@@ -170,7 +174,7 @@ caption(
     f"{name_b} is gaining."
 )
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- per-corner table
 

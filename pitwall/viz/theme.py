@@ -36,13 +36,28 @@ from pitwall.config import COMPOUND_COLOURS
 # Surfaces and ink
 # --------------------------------------------------------------------------
 
-SURFACE = "#0E1117"        # chart surface, matches the Streamlit dark theme
-PANEL = "#171B24"          # raised panel
+SURFACE = "#080808"        # near-black canvas, matches the app chrome
+PANEL = "#121316"          # raised panel
+PANEL_HI = "#1A1C21"       # hover / active panel
 INK_PRIMARY = "#FFFFFF"
-INK_SECONDARY = "#C3C2B7"
-INK_MUTED = "#898781"      # axis labels, ticks
-GRIDLINE = "#2C2C2A"
-BASELINE = "#383835"
+INK_SECONDARY = "#AFAFAF"
+INK_MUTED = "#7C818A"      # axis labels, ticks
+GRIDLINE = "#1E2024"
+BASELINE = "#2A2D33"
+
+# --------------------------------------------------------------------------
+# Racing accent
+# --------------------------------------------------------------------------
+#
+# Formula 1's own red, used for UI furniture only - never as a data colour,
+# so an accent can never be mistaken for a series. It measures 4.03:1 against
+# the canvas, which clears the 3:1 bar for marks and rules but not the 4.5:1
+# bar for small text, so a brighter step is used wherever the accent has to
+# carry words.
+
+ACCENT = "#E10600"         # fills, rules, active states      (4.03:1)
+ACCENT_TEXT = "#FF2D0A"    # small uppercase labels           (5.37:1)
+ACCENT_DIM = "#5A0A05"     # inactive / track-behind states
 
 # --------------------------------------------------------------------------
 # Series identity - fixed order, assigned in sequence, never cycled

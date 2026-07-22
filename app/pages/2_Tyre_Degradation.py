@@ -10,8 +10,10 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import brand  # noqa: E402
 from common import (  # noqa: E402
     caption,
+    load_artefact,
     load_laps,
     page_setup,
     session_header,
@@ -28,7 +30,8 @@ slug, meta = session_picker(key_prefix="deg")
 if slug is None:
     st.stop()
 
-session_header(meta)
+_track = load_artefact(slug, "trackmap")
+session_header(meta, "Tyre Degradation", track=_track)
 
 if meta["session"] != "R":
     st.info(
@@ -48,7 +51,7 @@ total_laps = int(meta["total_laps"])
 # ---------------------------------------------------------------- assumptions
 
 with st.sidebar:
-    st.markdown('<div class="pw-kicker">Model assumptions</div>', unsafe_allow_html=True)
+    brand.kicker("Model assumptions")
     fuel_effect = st.slider(
         "Fuel effect (s per kg)", 0.020, 0.045, FUEL_EFFECT_S_PER_KG, 0.001,
         help="Lap time gained per kg of fuel burned. Community estimates sit "
@@ -86,19 +89,16 @@ cols[-1].metric("Clean laps used", f"{len(prepared):,}",
 if not summary.empty and len(summary) > 1:
     softest = summary.iloc[0]
     hardest = summary.iloc[-1]
-    st.markdown(
-        f"<div style='background:{theme.PANEL};border-radius:10px;padding:14px 18px;"
-        f"color:{theme.INK_SECONDARY};line-height:1.6'>"
-        f"The <b style='color:{theme.INK_PRIMARY}'>{softest.Compound.lower()}</b> gives up "
-        f"<b style='color:{theme.INK_PRIMARY}'>{softest.deg_s_per_lap:.3f} s/lap</b> and the "
-        f"<b style='color:{theme.INK_PRIMARY}'>{hardest.Compound.lower()}</b> "
-        f"<b style='color:{theme.INK_PRIMARY}'>{hardest.deg_s_per_lap:.3f} s/lap</b> — a "
-        f"difference of {abs(softest.deg_s_per_lap - hardest.deg_s_per_lap):.3f} s per lap "
-        f"of stint length.</div>",
-        unsafe_allow_html=True,
+    brand.verdict(
+        f"The <b>{softest.Compound.lower()}</b> gives up "
+        f"<b>{softest.deg_s_per_lap:.3f} s/lap</b> and the "
+        f"<b>{hardest.Compound.lower()}</b> "
+        f"<b>{hardest.deg_s_per_lap:.3f} s/lap</b> — a difference of "
+        f"{abs(softest.deg_s_per_lap - hardest.deg_s_per_lap):.3f} s per lap "
+        f"of stint length."
     )
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- charts
 
@@ -136,7 +136,7 @@ with right:
         "applied silently."
     )
 
-st.divider()
+brand.kerb()
 
 # ---------------------------------------------------------------- per stint
 

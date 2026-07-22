@@ -119,6 +119,13 @@ def main() -> int:
             else:
                 ok += 1
             log.info("%s  %s", prefix, status)
+        except ingest.RateLimited as exc:
+            # No point continuing: the budget is hourly, so every remaining
+            # session would fail too. Stop cleanly and tell the user how to
+            # resume - the dataset is built to be restartable.
+            log.warning("%s  %s", prefix, exc)
+            log.info("stopping early with %d session(s) built this run", ok)
+            break
         except Exception as exc:  # noqa: BLE001 - one bad session must not stop a backfill
             failed += 1
             log.error("%s  FAILED: %s", prefix, exc)

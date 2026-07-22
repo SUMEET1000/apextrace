@@ -15,11 +15,12 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import brand  # noqa: E402
 from pitwall import store  # noqa: E402
 from pitwall.config import SESSION_LABELS  # noqa: E402
 from pitwall.corners import build_segments  # noqa: E402
 from pitwall.ingest import SessionKey  # noqa: E402
-from pitwall.viz import theme  # noqa: E402
+
 
 PAGE_ICON = "\U0001F3CE"
 
@@ -27,19 +28,7 @@ PAGE_ICON = "\U0001F3CE"
 def page_setup(title: str) -> None:
     st.set_page_config(page_title=f"{title} · Pit Wall",
                        page_icon=PAGE_ICON, layout="wide")
-    st.markdown(
-        f"""
-        <style>
-          .stApp {{ background: {theme.SURFACE}; }}
-          [data-testid="stMetricValue"] {{ font-variant-numeric: tabular-nums; }}
-          .pw-caption {{ color: {theme.INK_MUTED}; font-size: 0.82rem;
-                         margin: -0.5rem 0 1.1rem 0; line-height: 1.45; }}
-          .pw-kicker {{ color: {theme.INK_MUTED}; font-size: 0.75rem;
-                        letter-spacing: 0.12em; text-transform: uppercase; }}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    brand.inject()
 
 
 def caption(text: str) -> None:
@@ -141,14 +130,24 @@ def session_picker(*, key_prefix: str = "sel") -> tuple[str, pd.Series] | tuple[
     return key.slug, row.iloc[0]
 
 
-def session_header(meta: pd.Series) -> None:
-    st.markdown('<div class="pw-kicker">Pit Wall · F1 Telemetry Analysis</div>',
-                unsafe_allow_html=True)
-    st.title(f"{meta['event_name']} {int(meta['year'])}")
+def session_header(meta: pd.Series, page_title: str, *,
+                   track: pd.DataFrame | None = None) -> None:
+    """Compact branded header for an analysis page.
+
+    Carries the circuit outline as artwork so each page is visually anchored
+    to the session being analysed.
+    """
+    session_name = SESSION_LABELS.get(meta["session"], meta["session"])
+    art = brand.circuit_svg(track, width=190, height=120) if track is not None else ""
+    art_html = f'<div class="pw-hero-art">{art}</div>' if art else ""
     st.markdown(
-        f"<span style='color:{theme.INK_SECONDARY}'>"
-        f"{SESSION_LABELS.get(meta['session'], meta['session'])} · "
-        f"{meta['location']}, {meta['country']}</span>",
+        f"""<div class="pw-hero" style="padding:1.7rem 2rem 1.5rem">{art_html}
+          <div class="pw-kicker">{meta['event_name']} · {int(meta['year'])}
+            · {session_name}</div>
+          <h1 style="font-size:clamp(2rem,4vw,3.1rem)!important">{page_title}</h1>
+          <div class="pw-hero-sub" style="font-size:.92rem">
+            {meta['location']}, {meta['country']}</div>
+        </div>""",
         unsafe_allow_html=True,
     )
 

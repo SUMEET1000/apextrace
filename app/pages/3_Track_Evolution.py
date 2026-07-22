@@ -10,6 +10,7 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import brand  # noqa: E402
 from common import (  # noqa: E402
     caption,
     load_artefact,
@@ -28,7 +29,8 @@ slug, meta = session_picker(key_prefix="evo")
 if slug is None:
     st.stop()
 
-session_header(meta)
+_track = load_artefact(slug, "trackmap")
+session_header(meta, "Track Evolution", track=_track)
 
 laps = load_laps(slug)
 weather = load_artefact(slug, "weather")
@@ -148,16 +150,12 @@ verdict = (
        if wrong_direction else
        "a different figure, because tyre wear and fuel burn are folded into it.")
 )
-st.markdown(
-    f"<div style='background:{theme.PANEL};border-radius:10px;padding:14px 18px;"
-    f"color:{theme.INK_SECONDARY};line-height:1.6'>"
+brand.verdict(
     f"With tyre age and fuel accounted for, the circuit itself was worth "
-    f"<b style='color:{theme.INK_PRIMARY}'>{abs(gain):.3f} s</b> of lap time by the "
-    f"end of the race. {verdict}</div>",
-    unsafe_allow_html=True,
+    f"<b>{abs(gain):.3f} s</b> of lap time by the end of the race. {verdict}"
 )
 
-st.divider()
+brand.kerb()
 
 st.subheader("Evolution curve")
 st.plotly_chart(evolution_curve(result["curve"], naive),
@@ -168,7 +166,7 @@ caption(
     "estimate, shown to make the size of the confounding visible."
 )
 
-st.divider()
+brand.kerb()
 
 left, right = st.columns([3, 2], gap="large")
 
