@@ -249,6 +249,30 @@ shared x-axis. Two arbitrary scalings on one frame manufacture correlations.
 
 ---
 
+## Deploying
+
+The app is a pure reader: it loads the parquet artefacts under
+`data/processed/` and never calls the F1 API at runtime. `pitwall.ingest`
+imports `fastf1` but only opens the network inside `enable_cache()` and the
+ETL functions, which the UI does not touch. That means the built dataset is
+committed to the repo and the deployed app needs no credentials, no cron and
+no outbound access.
+
+On [Streamlit Community Cloud](https://share.streamlit.io), point a new app at
+this repo with:
+
+| Setting | Value |
+|---|---|
+| Main file path | `app/Home.py` |
+| Python version | 3.13 |
+
+`requirements.txt` at the repo root is picked up automatically, and
+`.streamlit/config.toml` carries the theme. Rebuilding the dataset is a local
+operation — re-run `build_dataset.py`, commit the new session directories and
+the updated `manifest.parquet`, and the deployment follows the push.
+
+---
+
 ## Notes
 
 `fastf1` requires `pandas<3`, so the project must run in its own virtual

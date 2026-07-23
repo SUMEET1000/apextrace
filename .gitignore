@@ -10,3 +10,6 @@ data/raw_cache/
 .streamlit/secrets.toml
 .DS_Store
 data/etl.log
+
+# Local knowledge-graph tool output
+graphify-out/
