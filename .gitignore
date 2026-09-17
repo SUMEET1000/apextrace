@@ -13,3 +13,15 @@ data/etl.log
 
 # Local knowledge-graph tool output
 graphify-out/
+
+# Private working notes. This repo is public: project files only.
+PROGRESS.md
+HANDOFF.md
+IDEAS.md
+DESIGN_PROGRESS.md
+PLAYBOOK.md
+PLANS/
+
+# Logs and backups
+*.bak
+backfill.log
