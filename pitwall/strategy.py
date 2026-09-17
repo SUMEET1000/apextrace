@@ -130,6 +130,74 @@ def race_pace(laps: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def head_to_head(laps: pd.DataFrame, driver_a: str, driver_b: str) -> pd.DataFrame:
+    """Lap-by-lap comparison of two drivers over a whole session.
+
+    One row per lap number either driver ran. ``delta_s`` is ``driver_b``
+    minus ``driver_a`` on that lap, so a positive value means ``driver_b``
+    lost time; ``cumulative_s`` is the running total.
+
+    This works from the lap table rather than telemetry deliberately. Only a
+    handful of laps per driver keep stored telemetry, but every lap has a
+    time, so a head-to-head over the full session is available where a
+    corner-level comparison is not.
+
+    Laps only one driver completed keep their own time and score no delta.
+    A retirement or a lapped car must not silently register as a gain, so
+    those laps contribute nothing to the cumulative figure.
+    """
+    if laps.empty or not {"Driver", "LapNumber"}.issubset(laps.columns):
+        return pd.DataFrame()
+    if "LapTime" not in laps.columns and "LapTime_s" not in laps.columns:
+        return pd.DataFrame()
+
+    # Same schema tolerance as gap_evolution below: read_laps restores the
+    # timedelta columns, raw parquet and the synthetic fixtures carry seconds.
+    df = laps.copy()
+    df["lap_time_s"] = (df["LapTime"].dt.total_seconds()
+                        if "LapTime" in df.columns else df["LapTime_s"])
+
+    def side(driver: str, suffix: str) -> pd.DataFrame:
+        one = (df[df["Driver"] == driver]
+               .dropna(subset=["LapNumber"])
+               .drop_duplicates(subset="LapNumber")
+               .sort_values("LapNumber"))
+        if one.empty:
+            return pd.DataFrame()
+
+        pit = pd.Series(False, index=one.index)
+        for base in ("PitInTime", "PitOutTime"):
+            for col in (base, f"{base}_s"):
+                if col in one.columns:
+                    pit |= one[col].notna()
+                    break
+
+        out = pd.DataFrame({
+            "LapNumber": one["LapNumber"].to_numpy(),
+            f"LapTime_s_{suffix}": one["lap_time_s"].to_numpy(),
+            f"pit_{suffix}": pit.to_numpy(),
+        })
+        for extra in ("Compound", "TyreLife", "Stint", "Position"):
+            if extra in one.columns:
+                out[f"{extra}_{suffix}"] = one[extra].to_numpy()
+        return out
+
+    a, b = side(driver_a, "a"), side(driver_b, "b")
+    if a.empty or b.empty:
+        return pd.DataFrame()
+
+    out = a.merge(b, on="LapNumber", how="outer").sort_values("LapNumber")
+    out["delta_s"] = out["LapTime_s_b"] - out["LapTime_s_a"]
+    # Uncomparable laps contribute zero rather than breaking the series: the
+    # gap simply does not move on a lap that cannot be scored.
+    out["cumulative_s"] = out["delta_s"].fillna(0.0).cumsum()
+    # eq(True) rather than fillna: the outer merge leaves NaN on laps only one
+    # driver ran, and fillna on an object column is a deprecated downcast.
+    for suffix in ("a", "b"):
+        out[f"pit_{suffix}"] = out[f"pit_{suffix}"].eq(True)
+    return out.reset_index(drop=True)
+
+
 def gap_evolution(laps: pd.DataFrame) -> pd.DataFrame:
     """Cumulative time gap to the race leader, lap by lap."""
     needed = {"Driver", "LapNumber"}

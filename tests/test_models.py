@@ -343,3 +343,33 @@ def test_gap_evolution_leader_is_always_zero():
     per_lap_min = gaps.groupby("LapNumber")["gap_s"].min()
     assert np.allclose(per_lap_min, 0.0)
     assert (gaps["gap_s"] >= -1e-9).all()
+
+
+def test_head_to_head_delta_matches_the_two_lap_times():
+    race = make_race(n_drivers=4, total_laps=30, seed=21)
+    h2h = strategy.head_to_head(race, "D00", "D01")
+
+    assert not h2h.empty
+    assert np.allclose(h2h["delta_s"], h2h["LapTime_s_b"] - h2h["LapTime_s_a"])
+    # The running total is exactly the deltas accumulated: the bottom panel of
+    # the chart must not drift away from the bars drawn above it.
+    assert np.isclose(h2h["cumulative_s"].iloc[-1], h2h["delta_s"].sum())
+
+
+def test_head_to_head_scores_no_delta_for_a_lap_only_one_driver_ran():
+    """A retirement must not read as the other driver gaining time.
+
+    The cumulative gap is the number a reader trusts. If laps the rival never
+    ran silently counted, a DNF would look like dominant pace.
+    """
+    race = make_race(n_drivers=2, total_laps=20, seed=3)
+    retired = race[~((race["Driver"] == "D01") & (race["LapNumber"] > 12))]
+
+    h2h = strategy.head_to_head(retired, "D00", "D01")
+
+    both_ran = h2h[h2h["LapNumber"] <= 12]
+    after = h2h[h2h["LapNumber"] > 12]
+    assert both_ran["delta_s"].notna().all()
+    assert after["delta_s"].isna().all()
+    # The gap stops moving once there is nothing left to compare against.
+    assert np.isclose(h2h["cumulative_s"].iloc[-1], both_ran["delta_s"].sum())

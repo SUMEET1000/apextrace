@@ -22,6 +22,50 @@ from pitwall.config import (
 )
 
 
+def corner_data_issues(corners: pd.DataFrame) -> list[str]:
+    """Reasons a session's corner markers would *mislabel* the lap.
+
+    An empty list means the markers can be trusted; anything else means
+    :func:`build_segments` would still return a plausible-looking tiling built
+    on nonsense. That is the failure this exists to stop. The corners artefact
+    is stored in corner-number order, so a distance axis that does not increase
+    down the frame means the marker for T12 sits *after* T12A on the track, and
+    duplicate distances mean two numbered corners were projected onto the same
+    point. 2026/11_R has both: T1/T1A share 661.2 m and T12 lands 306 m past
+    T12A. ``build_segments`` tiles it happily - 19 contiguous segments, no gaps,
+    no negative lengths - and every corner delta read off it is wrong. Worse,
+    it *sorts* by distance first, so a misplaced marker is not dropped: it is
+    silently relabelled onto whatever stretch of track its bad distance points
+    at, and the reader sees "T20" over a segment that is nowhere near T20.
+
+    Absent markers are deliberately **not** an issue here. A session with no
+    corner data degrades to a single honest "Full lap" segment, and nothing is
+    mislabelled - Monaco 2026/06_R is the case in point, where refusing would
+    also throw away a usable ghost replay and head-to-head. The danger being
+    guarded against is markers that are wrong, not markers that are missing.
+    """
+    if corners is None or corners.empty or "Distance" not in corners.columns:
+        return []
+
+    issues: list[str] = []
+    distance = corners["Distance"]
+
+    n_nan = distance.isna().sum()
+    if n_nan:
+        issues.append(f"{n_nan} corner marker(s) have no distance")
+
+    valid = distance.dropna()
+    n_dup = valid.duplicated().sum()
+    if n_dup:
+        issues.append(
+            f"{n_dup} corner marker(s) share a distance with another corner")
+    if not valid.is_monotonic_increasing:
+        issues.append(
+            "corner distances do not increase with corner number, so the "
+            "markers are out of order around the lap")
+    return issues
+
+
 def build_segments(
     corners: pd.DataFrame,
     lap_length: float,
@@ -246,8 +290,17 @@ def compare_corners(
     """Side-by-side segment comparison of two laps.
 
     ``lap_a`` is the reference. ``delta_s`` is the time B gains or loses in
-    each segment: **negative means B is faster there**. Because the segments
-    tile the whole lap, ``delta_s`` sums to the lap-time difference.
+    each segment: **negative means B is faster there**. When both laps cover
+    the whole track the segments tile it completely, so ``delta_s`` sums to
+    the lap-time difference.
+
+    That last property does **not** hold if either lap is partial - a
+    grid-start lap, an in-lap or an out-lap has no telemetry outside its
+    covered span, so the segments there are not comparable and carry NaN.
+    ``comparable`` marks the segments that do have both laps, and
+    :func:`summarise_comparison` reports how much of the lap that is. A
+    caller that prints a total without also printing the coverage is quietly
+    comparing two different fractions of a lap.
     """
     ma = corner_metrics(lap_a, segments)
     mb = corner_metrics(lap_b, segments)
@@ -269,22 +322,41 @@ def compare_corners(
 
     # The headline number: time B gained (negative) or lost (positive) here.
     out["delta_s"] = mb["seg_time_s"].to_numpy() - ma["seg_time_s"].to_numpy()
+    out["comparable"] = out["delta_s"].notna()
+    # cumsum skips NaN, so the running total carries across a gap rather than
+    # dying at the first uncovered segment; the gap itself stays NaN.
     out["cum_delta_s"] = out["delta_s"].cumsum()
     return out
 
 
 def summarise_comparison(comparison: pd.DataFrame, *, top_n: int = 3) -> dict:
-    """Headline findings from a comparison, for a plain-English summary."""
+    """Headline findings from a comparison, for a plain-English summary.
+
+    ``coverage`` is the fraction of the lap's *distance* where both laps have
+    telemetry. It is 1.0 for two flying laps and less whenever a partial lap
+    is involved; the totals below are sums over that fraction only.
+    """
     if comparison.empty:
         return {}
     corners_only = comparison[comparison["kind"] == "corner"]
     ranked = comparison.reindex(comparison["delta_s"].abs().sort_values(ascending=False).index)
+
+    comparable = comparison.get("comparable", pd.Series(True, index=comparison.index))
+    span = (comparison["end_m"] - comparison["start_m"]).abs()
+    total_span = float(span.sum())
+    coverage = float(span[comparable].sum() / total_span) if total_span else 0.0
+    missing = comparison.loc[~comparable, "label"].tolist()
+
     return {
         "total_delta_s": float(comparison["delta_s"].sum()),
         "corner_delta_s": float(corners_only["delta_s"].sum()),
         "straight_delta_s": float(
             comparison[comparison["kind"] == "straight"]["delta_s"].sum()
         ),
+        "coverage": coverage,
+        "n_segments": int(len(comparison)),
+        "n_comparable": int(comparable.sum()),
+        "uncomparable_labels": missing,
         "biggest_gains": ranked[ranked["delta_s"] < 0].head(top_n)[
             ["label", "delta_s"]
         ].to_dict("records"),

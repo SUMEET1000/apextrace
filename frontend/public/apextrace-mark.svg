@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="ApexTrace Mark">
+  <title>ApexTrace</title>
+  <defs>
+    <pattern id="at-mark-kerb" width="12" height="6" patternUnits="userSpaceOnUse"
+             patternTransform="skewX(-22)">
+      <rect width="12" height="6" fill="#E10600"/>
+      <rect width="6" height="6" fill="#F2F2F2"/>
+    </pattern>
+    <clipPath id="at-mark-clip">
+      <rect x="15" y="46" width="34" height="5" rx="1"/>
+    </clipPath>
+  </defs>
+
+  <rect x="2" y="2" width="60" height="60" rx="13" fill="#121316" stroke="#E10600" stroke-width="2.5"/>
+
+  <text x="32" y="41" text-anchor="middle"
+        font-family="'Arial Narrow','Haettenschweiler',Impact,'Barlow Condensed',sans-serif"
+        font-size="31" font-weight="700" letter-spacing="0.5" fill="#FFFFFF">AT</text>
+
+  <g clip-path="url(#at-mark-clip)">
+    <rect x="15" y="46" width="34" height="5" fill="url(#at-mark-kerb)"/>
+  </g>
+</svg>

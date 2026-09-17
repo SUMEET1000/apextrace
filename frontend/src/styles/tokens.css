@@ -1,0 +1,59 @@
+/* Design tokens — ported verbatim from the `:root` block of app/brand.py.
+ *
+ * Every value here has one upstream definition in `pitwall/viz/theme.py`, so
+ * the charts and the panels behind them cannot drift apart. The API serves the
+ * same numbers from /api/theme for anything that needs them in JavaScript;
+ * these are the CSS half of the same table.
+ *
+ * Nothing outside this file may introduce a colour, radius, duration or
+ * breakpoint. */
+
+:root {
+  --canvas: #080808;
+  --panel: #202329;
+  --panel-hi: #2A2E36;
+  --accent: #E63946;
+  --accent-text: #FF4D5E;
+  --accent-hover: #C90500;
+  --ink: #FFFFFF;
+  --ink-2: #AFAFAF;
+  --ink-3: #7C818A;
+  --line: #5A5F6A;
+  --rule: #6A707C;
+
+  /* Motion. Defined once here so page transitions, stale fades and hover
+     states share one vocabulary instead of each picking a number. */
+  --dur-fast: .16s;
+  --dur-base: .28s;
+  --dur-slow: .52s;
+  --ease-out: cubic-bezier(.22, .61, .36, 1);
+
+  /* The breakpoint scale. A media query cannot read a custom property —
+     `@media (max-width: var(--bp-md))` is not a thing — so the queries in
+     global.css are written with the literal values and these aliases exist so
+     the scale is documented in the DOM alongside everything else.
+
+     BP_MD is where the hero art and the four-across grids stop fitting.
+     BP_SM is a phone in portrait, where the remaining problem is vertical:
+     several tables ask for 380–640px of fixed height, which on a 320x640
+     screen is the whole viewport spent on one table. */
+  --bp-sm: 480px;
+  --bp-md: 900px;
+
+  /* Fixed table height on a phone. Roughly eight rows plus the header —
+     enough to read as a table and to show that it scrolls, without the page
+     becoming one. */
+  --table-height-sm: 300px;
+
+  /* Type stacks. Display face for headings only; body, labels and every chart
+     stay in Inter, so data never has to be read through a display face. */
+  --font-display: 'Anton', 'Arial Narrow', 'Haettenschweiler', sans-serif;
+  --font-label: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Timing-screen ink. Mirrors theme.TIMING_* — purple for the session best,
+     green for a personal best, yellow for anything slower. */
+  --timing-session-best: #C06BF0;
+  --timing-personal-best: #3FBF5F;
+  --timing-slower: #FFF200;
+}

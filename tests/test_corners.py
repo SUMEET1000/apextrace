@@ -9,6 +9,7 @@ import pytest
 from pitwall.corners import (
     build_segments,
     compare_corners,
+    corner_data_issues,
     corner_metrics,
     summarise_comparison,
 )
@@ -195,3 +196,48 @@ def test_summary_separates_corner_and_straight_losses(segments):
         summary["total_delta_s"], abs=1e-6
     )
     assert summary["biggest_losses"]
+
+
+# --- corner-marker integrity ---------------------------------------------
+
+def test_clean_corner_markers_report_no_issues(corners_frame):
+    assert corner_data_issues(corners_frame) == []
+
+
+def test_absent_corner_data_is_not_treated_as_corruption():
+    """Monaco 2026/06_R has no markers at all. That degrades to a single honest
+    "Full lap" segment, so refusing would cost a usable ghost replay and
+    head-to-head while preventing no mislabelling."""
+    assert corner_data_issues(pd.DataFrame()) == []
+    assert build_segments(pd.DataFrame(), LAP_LENGTH)["kind"].tolist() == ["lap"]
+
+
+def test_duplicate_and_out_of_order_markers_are_both_caught(corners_frame):
+    """The 2026/11_R defect shape: two corners on one point, and one that
+    sits *behind* the corner numbered after it."""
+    broken = corners_frame.copy()
+    broken.loc[1, "Distance"] = 1000.0   # T2 duplicates T1's apex
+    broken.loc[2, "Distance"] = 500.0    # T3 lands before both
+    issues = corner_data_issues(broken)
+    assert any("share a distance" in i for i in issues)
+    assert any("out of order" in i for i in issues)
+
+
+def test_broken_markers_still_tile_cleanly_which_is_why_the_check_exists(
+    corners_frame,
+):
+    """build_segments does not fail on corrupt markers - it returns a
+    contiguous, plausible-looking tiling. Nothing downstream can tell that
+    tiling from a correct one, so the refusal has to happen before it."""
+    broken = corners_frame.copy()
+    broken.loc[1, "Distance"] = 1000.0
+    broken.loc[2, "Distance"] = 500.0
+
+    seg = build_segments(broken, LAP_LENGTH)
+    ordered = seg.sort_values("start_m")
+    gaps = (ordered["start_m"].shift(-1) - ordered["end_m"]).dropna()
+
+    assert not seg.empty
+    assert (gaps.abs() < 1e-9).all()                      # no gaps
+    assert (seg["end_m"] >= seg["start_m"]).all()         # no negative spans
+    assert corner_data_issues(broken)                     # only this catches it

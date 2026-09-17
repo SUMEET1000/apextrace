@@ -8,11 +8,14 @@ frame invite comparisons the data does not support.
 
 from __future__ import annotations
 
+import math
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+from pitwall.config import DEGRADATION_FACET_COLUMNS
 from pitwall.viz import theme
 
 
@@ -41,10 +44,21 @@ def degradation_scatter(laps: pd.DataFrame, stints: pd.DataFrame,
     if not compounds:
         return go.Figure()
 
-    fig = make_subplots(rows=1, cols=len(compounds), shared_yaxes=True,
-                        subplot_titles=compounds, horizontal_spacing=0.03)
+    # Wrapped into a grid rather than one long row: see
+    # config.DEGRADATION_FACET_COLUMNS for why a four-panel strip is unreadable
+    # on a phone.
+    n_cols = min(len(compounds), DEGRADATION_FACET_COLUMNS)
+    n_rows = math.ceil(len(compounds) / n_cols)
+    # Every panel carries its own x-axis title, so a second row needs room for
+    # that title, its tick labels and the next panel's heading between them -
+    # a tight gap puts the lower compound's name on top of the upper one's axis.
+    fig = make_subplots(rows=n_rows, cols=n_cols, shared_yaxes=True,
+                        subplot_titles=compounds, horizontal_spacing=0.03,
+                        vertical_spacing=0.15 if n_rows > 1 else 0.0)
 
-    for i, compound in enumerate(compounds, start=1):
+    for index, compound in enumerate(compounds):
+        row, i = divmod(index, n_cols)
+        row, i = row + 1, i + 1
         subset = laps[laps["Compound"] == compound]
         colour = theme.compound_colour(compound)
         fig.add_trace(go.Scatter(
@@ -55,7 +69,7 @@ def degradation_scatter(laps: pd.DataFrame, stints: pd.DataFrame,
             hovertemplate=("%{customdata}<br>tyre age %{x:.0f} laps"
                            "<br>%{y:.3f} s<extra></extra>"),
             customdata=subset["Driver"],
-        ), row=1, col=i)
+        ), row=row, col=i)
 
         fit = stints[stints["Compound"] == compound] if not stints.empty else pd.DataFrame()
         if not fit.empty:
@@ -67,12 +81,15 @@ def degradation_scatter(laps: pd.DataFrame, stints: pd.DataFrame,
                 x=age, y=intercept + slope * age, mode="lines",
                 line=dict(color=colour, width=2.5), showlegend=False,
                 hovertemplate=f"{slope:+.3f} s/lap<extra></extra>",
-            ), row=1, col=i)
+            ), row=row, col=i)
 
-        fig.update_xaxes(title_text="Tyre age (laps)", row=1, col=i)
+        fig.update_xaxes(title_text="Tyre age (laps)", row=row, col=i)
 
-    fig.update_yaxes(title_text="Fuel-corrected lap time (s)", row=1, col=1)
-    theme.apply(fig, height=height)
+    for row in range(1, n_rows + 1):
+        fig.update_yaxes(title_text="Fuel-corrected lap time (s)", row=row, col=1)
+    # A second row needs vertical room of its own, or the panels compress into
+    # strips; the caller's `height` is the height of one row of facets.
+    theme.apply(fig, height=int(height * (1 + 0.72 * (n_rows - 1))))
     fig.update_layout(hovermode="closest")
     for annotation in fig.layout.annotations[:len(compounds)]:
         annotation.update(font=dict(color=theme.INK_SECONDARY, size=12))
@@ -201,6 +218,39 @@ def evolution_with_temperature(curve: pd.DataFrame, weather: pd.DataFrame,
     return fig
 
 
+def session_best_curve(progression: pd.DataFrame, *,
+                       height: int = 440) -> go.Figure:
+    """Every lap of a session against the running session best.
+
+    The qualifying counterpart to :func:`evolution_curve`. A session with no
+    staggered pit stops cannot identify the pooled model, so what is honestly
+    available is the observed best-so-far, not a decomposition of it - hence a
+    step line over the raw laps rather than a fitted curve with an interval.
+
+    Expects the output of ``evolution.session_best_progression``.
+    """
+    if progression.empty:
+        return go.Figure()
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=progression["session_minutes"], y=progression["lap_time_s"],
+        mode="markers", name="Individual laps",
+        marker=dict(size=5, color=theme.INK_MUTED, opacity=0.5),
+        hovertemplate="%{y:.3f} s<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=progression["session_minutes"], y=progression["session_best_s"],
+        mode="lines", name="Session best",
+        line=dict(color=theme.SERIES[0], width=2.5),
+        hovertemplate="best %{y:.3f} s<extra></extra>",
+    ))
+    fig.update_xaxes(title_text="Minutes into session")
+    fig.update_yaxes(title_text="Lap time (s)")
+    theme.apply(fig, height=height)
+    return fig
+
+
 # ------------------------------------------------------------------ strategy
 
 def stint_chart(stints: pd.DataFrame, *, height: int = 640) -> go.Figure:
@@ -241,23 +291,32 @@ def stint_chart(stints: pd.DataFrame, *, height: int = 640) -> go.Figure:
 
 
 def race_pace_box(laps: pd.DataFrame, pace: pd.DataFrame,
-                  *, height: int = 520) -> go.Figure:
+                  *, results: pd.DataFrame | None = None,
+                  height: int = 520) -> go.Figure:
     """Distribution of clean fuel-corrected lap times per driver, fastest first.
 
     A box rather than a bar: race pace is a distribution, and consistency is
     part of what the reader is looking for.
+
+    Boxes carry team colour where the results artefact supplies one. A box has
+    no dash property, so the second driver of a team is drawn **hollow** rather
+    than filled - a shape difference, readable without hue - and the driver
+    code is on the axis under every box regardless.
     """
     if laps.empty or pace.empty:
         return go.Figure()
 
     order = pace["Driver"].tolist()
+    styles = theme.team_styles(results, order)
     fig = go.Figure()
     for driver in order:
         subset = laps[laps["Driver"] == driver]
+        colour, dash = styles.get(driver, (theme.SERIES[0], "solid"))
         fig.add_trace(go.Box(
             y=subset["LapTime_corrected_s"], name=driver,
-            marker=dict(color=theme.SERIES[0], size=4),
-            line=dict(width=1.4), fillcolor=_rgba(theme.SERIES[0], 0.22),
+            marker=dict(color=colour, size=4),
+            line=dict(width=1.4),
+            fillcolor=_rgba(colour, 0.22 if dash == "solid" else 0.0),
             boxpoints=False, showlegend=False,
             hovertemplate=f"<b>{driver}</b><br>%{{y:.3f}} s<extra></extra>",
         ))
@@ -268,20 +327,149 @@ def race_pace_box(laps: pd.DataFrame, pace: pd.DataFrame,
     return fig
 
 
-def gap_chart(gaps: pd.DataFrame, drivers: list[str], *, height: int = 480) -> go.Figure:
-    """Gap to the leader over the race for a chosen handful of drivers."""
+def gap_chart(gaps: pd.DataFrame, drivers: list[str],
+              *, results: pd.DataFrame | None = None,
+              height: int = 480) -> go.Figure:
+    """Gap to the leader over the race for a chosen handful of drivers.
+
+    Lines take team colour where the results artefact supplies one, falling
+    back to the categorical palette. Teammates share a colour exactly, so the
+    second one of a pair is dashed.
+    """
     if gaps.empty or not drivers:
         return go.Figure()
+    chosen = drivers[:8]
+    styles = theme.team_styles(results, chosen)
     fig = go.Figure()
-    for i, driver in enumerate(drivers[:8]):
+    for i, driver in enumerate(chosen):
         subset = gaps[gaps["Driver"] == driver]
+        colour, dash = styles.get(driver, (theme.series_colour(i), "solid"))
         fig.add_trace(go.Scatter(
             x=subset["LapNumber"], y=subset["gap_s"], mode="lines",
-            name=driver, line=dict(color=theme.series_colour(i), width=2),
+            name=driver, line=dict(color=colour, width=2, dash=dash),
             hovertemplate=f"<b>{driver}</b><br>lap %{{x:.0f}}: +%{{y:.1f}} s<extra></extra>",
         ))
     fig.update_xaxes(title_text="Lap")
     fig.update_yaxes(title_text="Gap to leader (s)", autorange="reversed")
+    theme.apply(fig, height=height)
+    return fig
+
+
+def position_chart(laps: pd.DataFrame, *, results: pd.DataFrame | None = None,
+                   height: int = 560) -> go.Figure:
+    """Track position lap by lap, P1 at the top - the classic race spaghetti.
+
+    Structurally the sibling of :func:`gap_chart`: the same lines over the same
+    x-axis, but position rather than seconds, so overtakes read as crossings
+    instead of as convergence. Reversed y-axis because P1 belongs at the top;
+    an ordinary axis would put the winner at the bottom of the chart.
+
+    Every driver is drawn - the whole point is the crossings, and choosing a
+    handful would hide the ones the reader has not thought to ask about.
+    """
+    if laps.empty or "Position" not in laps.columns:
+        return go.Figure()
+
+    have = laps.dropna(subset=["Position", "LapNumber"])
+    if have.empty:
+        return go.Figure()
+
+    # Finishing order, so the legend reads like a classification.
+    order = (have.sort_values("LapNumber").groupby("Driver", observed=True)
+                 ["Position"].last().sort_values().index.tolist())
+    styles = theme.team_styles(results, order)
+
+    fig = go.Figure()
+    for i, driver in enumerate(order):
+        subset = have[have["Driver"] == driver].sort_values("LapNumber")
+        colour, dash = styles.get(driver, (theme.series_colour(i), "solid"))
+        fig.add_trace(go.Scatter(
+            x=subset["LapNumber"], y=subset["Position"], mode="lines",
+            name=driver, line=dict(color=colour, width=2, dash=dash),
+            hovertemplate=f"<b>{driver}</b><br>lap %{{x:.0f}}: P%{{y:.0f}}<extra></extra>",
+        ))
+
+    fig.update_xaxes(title_text="Lap")
+    # tick0 anchors the labels on P1: without it the axis starts counting from
+    # zero and offers the reader a "P0" that does not exist.
+    fig.update_yaxes(title_text="Position", autorange="reversed",
+                     tick0=1, dtick=2, tickprefix="P")
+    theme.apply(fig, height=height)
+    fig.update_layout(hovermode="closest")
+    return fig
+
+
+def lap_by_lap(h2h: pd.DataFrame, *, name_a: str, name_b: str,
+               height: int = 700) -> go.Figure:
+    """Two drivers lap by lap: times, the per-lap delta, the running total.
+
+    Three stacked panels on one x-axis rather than any of it overlaid. All
+    three are seconds, but they do not share a scale - the cumulative series
+    spans an order of magnitude more than the per-lap one, and drawing them
+    together would flatten the detail that makes the per-lap panel readable.
+
+    Pit laps are marked rather than dropped. They are the outliers that
+    explain most sudden steps in the cumulative gap, so hiding them would
+    make the chart look like a pace story when it is a strategy one.
+    """
+    if h2h.empty:
+        return go.Figure()
+
+    colour_a, colour_b = theme.series_colour(0), theme.series_colour(1)
+    fig = make_subplots(
+        rows=3, cols=1, shared_xaxes=True, vertical_spacing=0.07,
+        row_heights=[0.44, 0.28, 0.28],
+        subplot_titles=("Lap time (s)",
+                        f"Per-lap delta (s)  ·  {name_b} − {name_a}",
+                        f"Cumulative gap (s)  ·  {name_b} − {name_a}"),
+    )
+
+    for name, suffix, colour in ((name_a, "a", colour_a), (name_b, "b", colour_b)):
+        col = f"LapTime_s_{suffix}"
+        if col not in h2h.columns:
+            continue
+        # Line style carries identity as well as colour, matching the trace
+        # panel on the same page.
+        fig.add_trace(go.Scatter(
+            x=h2h["LapNumber"], y=h2h[col], mode="lines+markers", name=name,
+            line=dict(color=colour, width=2,
+                      dash="solid" if suffix == "a" else "dash"),
+            marker=dict(size=4),
+            hovertemplate=f"<b>{name}</b><br>lap %{{x:.0f}}: %{{y:.3f}} s<extra></extra>",
+        ), row=1, col=1)
+
+        pit_col = f"pit_{suffix}"
+        if pit_col in h2h.columns:
+            pits = h2h[h2h[pit_col].astype(bool)]
+            if not pits.empty:
+                fig.add_trace(go.Scatter(
+                    x=pits["LapNumber"], y=pits[col], mode="markers",
+                    name=f"{name} pit",
+                    marker=dict(color=colour, size=11, symbol="triangle-down",
+                                line=dict(color="#ffffff", width=1)),
+                    hovertemplate=f"<b>{name}</b> pit lap %{{x:.0f}}<extra></extra>",
+                    showlegend=False,
+                ), row=1, col=1)
+
+    # Direction is the second channel: bars above the line are laps the
+    # reference won, below are laps the compared driver won, so the reading
+    # never rests on colour alone.
+    delta = h2h.dropna(subset=["delta_s"])
+    fig.add_trace(go.Bar(
+        x=delta["LapNumber"], y=delta["delta_s"], name="Per-lap delta",
+        marker_color=[colour_a if v > 0 else colour_b for v in delta["delta_s"]],
+        hovertemplate="lap %{x:.0f}: %{y:+.3f} s<extra></extra>", showlegend=False,
+    ), row=2, col=1)
+
+    fig.add_trace(go.Scatter(
+        x=h2h["LapNumber"], y=h2h["cumulative_s"], mode="lines",
+        name="Cumulative", line=dict(color=theme.SERIES[3], width=2.5),
+        hovertemplate="lap %{x:.0f}: %{y:+.2f} s<extra></extra>", showlegend=False,
+    ), row=3, col=1)
+
+    for row in (1, 2, 3):
+        fig.update_yaxes(title_text="s", row=row, col=1)
+    fig.update_xaxes(title_text="Lap", row=3, col=1)
     theme.apply(fig, height=height)
     return fig
 

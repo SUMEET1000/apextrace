@@ -3,9 +3,15 @@
 fastf1>=3.8,<4
 pandas>=2.2,<3
 numpy>=1.26,<3
-streamlit>=1.40
+# Plotly stays after the Streamlit frontend was replaced by React: the API
+# still builds every figure with pitwall/viz and serves it as figure JSON,
+# which the browser renders with a version-matched plotly.js.
 plotly>=5.24
 statsmodels>=0.14
 scipy>=1.11
 pyarrow>=17
 pytest>=8
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+

@@ -1,6 +1,6 @@
 """The signature view: two laps stacked channel by channel against distance.
 
-Four panels share one x-axis in metres, with corner markers drawn through all
+Five panels share one x-axis in metres, with corner markers drawn through all
 of them so a feature in the speed trace can be read straight down into the
 delta. Stacked panels on a shared axis are used rather than a second y-axis:
 speed in km/h and time in seconds have no common scale, and overlaying them
@@ -39,24 +39,24 @@ def trace_panel(
     *,
     name_a: str,
     name_b: str | None = None,
-    height: int = 720,
+    height: int = 820,
 ) -> go.Figure:
-    """Speed / throttle / brake+gear / delta-time, stacked on shared distance.
+    """Speed / throttle / brake / gear / delta-time, stacked on shared distance.
 
     ``lap_a`` is the reference. The delta panel is omitted when only one lap
     is supplied.
     """
     show_delta = lap_b is not None and name_b is not None
-    rows = 4 if show_delta else 3
-    titles = ["Speed (km/h)", "Throttle (%)", "Gear"]
-    heights = [0.40, 0.20, 0.15]
+    rows = 5 if show_delta else 4
+    titles = ["Speed (km/h)", "Throttle (%)", "Brake", "Gear"]
+    heights = [0.40, 0.22, 0.19, 0.19]
     if show_delta:
         titles.append(f"Cumulative delta (s) — below zero means {name_b} ahead")
-        heights = [0.34, 0.17, 0.14, 0.35]
+        heights = [0.30, 0.16, 0.13, 0.13, 0.28]
 
     fig = make_subplots(
         rows=rows, cols=1, shared_xaxes=True,
-        vertical_spacing=0.045,
+        vertical_spacing=0.04,
         row_heights=heights,
         subplot_titles=titles,
     )
@@ -69,6 +69,13 @@ def trace_panel(
         d = lap["Distance"].to_numpy()
         common = dict(x=d, mode="lines", legendgroup=name,
                       line=dict(color=colour, width=2, dash=dash))
+        # The discrete channels below are edge-held outside a partial lap's
+        # covered span rather than NaN, because the compact on-disk dtypes
+        # cannot hold NaN. Speed is continuous and *is* restored to NaN, so it
+        # is the authority on what the car actually drove; without this mask a
+        # stretch of track the lap never reached reads as a held gear and a
+        # confident foot off the brake.
+        covered = lap["Speed"].notna().to_numpy()
         # Only the first panel carries the legend entry; the same colour and
         # dash identify the driver in every panel below it.
         fig.add_trace(go.Scatter(
@@ -80,12 +87,22 @@ def trace_panel(
             hovertemplate=f"{name}  %{{y:.0f}}%<extra></extra>", **common
         ), row=2, col=1)
         fig.add_trace(go.Scatter(
-            y=lap["nGear"], name=name, showlegend=False,
+            y=np.where(covered, lap["Brake"].astype(float), np.nan),
+            name=name, showlegend=False,
+            line_shape="hv",
+            hovertemplate=f"{name}  %{{customdata}}<extra></extra>",
+            customdata=np.where(lap["Brake"].to_numpy().astype(bool), "on", "off"),
+            **{k: v for k, v in common.items() if k != "line"},
+            line=dict(color=colour, width=1.6, dash=dash),
+        ), row=3, col=1)
+        fig.add_trace(go.Scatter(
+            y=np.where(covered, lap["nGear"].astype(float), np.nan),
+            name=name, showlegend=False,
             line_shape="hv",
             hovertemplate=f"{name}  gear %{{y:.0f}}<extra></extra>",
             **{k: v for k, v in common.items() if k != "line"},
             line=dict(color=colour, width=1.6, dash=dash),
-        ), row=3, col=1)
+        ), row=4, col=1)
 
     # Braking zones as shaded bands on the speed panel - where the car is
     # slowing is the context every other channel is read against.
@@ -112,8 +129,8 @@ def trace_panel(
             line=dict(color=theme.INK_SECONDARY, width=2),
             fill="tozeroy", fillcolor="rgba(195,194,183,0.10)",
             hovertemplate="%{y:+.3f} s<extra></extra>",
-        ), row=4, col=1)
-        fig.add_hline(y=0, line=dict(color=theme.BASELINE, width=1), row=4, col=1)
+        ), row=5, col=1)
+        fig.add_hline(y=0, line=dict(color=theme.BASELINE, width=1), row=5, col=1)
 
     fig.update_layout(shapes=_corner_shapes(segments) + brake_shapes)
 
@@ -127,7 +144,11 @@ def trace_panel(
 
     fig.update_xaxes(title_text="Lap distance (m)", row=rows, col=1)
     fig.update_yaxes(rangemode="tozero", row=2, col=1)
-    fig.update_yaxes(dtick=1, row=3, col=1)
+    # An on/off channel gets named ticks rather than 0 and 1, and a little
+    # padding so neither state is drawn on the panel edge.
+    fig.update_yaxes(tickmode="array", tickvals=[0, 1], ticktext=["off", "on"],
+                     range=[-0.12, 1.12], row=3, col=1)
+    fig.update_yaxes(dtick=1, row=4, col=1)
 
     theme.apply(fig, height=height)
     # The legend sits right, clear of the corner numbers that run along the

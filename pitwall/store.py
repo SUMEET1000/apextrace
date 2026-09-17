@@ -1,8 +1,9 @@
 """Parquet persistence and the session manifest.
 
-The app reads exclusively through this module. It does not import streamlit -
-caching is applied by the app layer via ``st.cache_data`` wrappers, keeping
-this importable from tests and notebooks.
+The app reads exclusively through this module, and it caches nothing - the
+API layer wraps these functions in ``api/cache.py`` with the bounds each one
+needs, which keeps this importable from tests and notebooks with no cache
+semantics attached.
 """
 
 from __future__ import annotations
@@ -102,7 +103,21 @@ def get_lap(telemetry: pd.DataFrame, driver: str,
     if drv.empty:
         return drv
     if lap_number is None:
-        lap_number = drv.loc[drv["LapTime_s"].idxmin(), "LapNumber"]
+        timed = drv["LapTime_s"].dropna()
+        if timed.empty:
+            # Every stored lap for this driver is untimed. A retirement does
+            # this: VER's only stored lap in Monaco 2026/06_R is lap 1, a
+            # ``start`` kind with no LapTime. ``idxmin`` on an all-NaN series
+            # returns NaN, and the ``.loc`` lookup then raised ``KeyError: nan``
+            # rather than returning the lap the driver demonstrably has.
+            #
+            # Fall back to the lowest lap number: deterministic, and a real lap.
+            # Picking a default is allowed here precisely because the caller
+            # states which lap it landed on - the same contract the fastest-lap
+            # default already relies on.
+            lap_number = drv["LapNumber"].min()
+        else:
+            lap_number = drv.loc[timed.idxmin(), "LapNumber"]
     return drv[drv["LapNumber"] == lap_number].reset_index(drop=True)
 
 

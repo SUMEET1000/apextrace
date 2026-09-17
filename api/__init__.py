@@ -1,0 +1,1 @@
+"""ApexTrace FastAPI backend package."""

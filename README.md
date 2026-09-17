@@ -1,4 +1,4 @@
-# Pit Wall — F1 Telemetry Analysis
+# ApexTrace — F1 Telemetry Analysis
 
 An analysis tool for Formula 1 timing and telemetry data. It compares drivers
 corner by corner, measures tyre degradation with confidence intervals, and
@@ -13,8 +13,13 @@ positional data, lap and sector times, tyre compounds and stint history.
 python -m venv .venv
 .venv/Scripts/python -m pip install -r requirements.txt
 .venv/Scripts/python scripts/build_dataset.py --years 2024 --sessions Q R
-.venv/Scripts/python -m streamlit run app/Home.py
+
+cd frontend && npm install && cd ..
+.venv/Scripts/python scripts/run_dev.py
 ```
+
+The app is then on <http://localhost:5173>, with the API and its OpenAPI docs
+on <http://localhost:8000/docs>.
 
 ---
 
@@ -114,14 +119,24 @@ FastF1 (official F1 timing API)
         laps · telemetry · trackmap · corners · weather · results   (Parquet)
         │
         ▼
-   pitwall/  — pure pandas/numpy analysis library (no Streamlit)
+   pitwall/  — pure pandas/numpy analysis library (no UI, no web framework)
         │
         ▼
-   app/  — Streamlit UI, caching and deep links only
+   api/  — FastAPI: caching, JSON safety, chart figures over HTTP
+        │
+        ▼
+   frontend/  — React + TypeScript: layout, widgets and deep links only
 ```
 
-`pitwall/` never imports Streamlit. Every analysis function is unit-testable
-and can be lifted into a notebook unchanged.
+`pitwall/` never imports a UI or web framework. Every analysis function is
+unit-testable and can be lifted into a notebook unchanged — which is why
+replacing the original Streamlit frontend with React was a change to `api/`
+and `frontend/` and touched no analysis code at all.
+
+The charts are the same figures either way: `api/charts.py` calls the existing
+`pitwall/viz` builders and serves `fig.to_json()`, which the browser renders
+with a version-matched plotly.js. Nothing about a chart is re-implemented in
+the frontend.
 
 ### The design decision that made it shippable
 
@@ -245,7 +260,8 @@ shared x-axis. Two arbitrary scalings on one frame manufacture correlations.
 | `pitwall/viz/` | Shared theme and one figure builder per view |
 | `scripts/build_dataset.py` | ETL CLI |
 | `scripts/validate_dataset.py` | Post-build integrity checks |
-| `app/` | Streamlit UI |
+| `api/` | FastAPI service: cached loaders, JSON endpoints, chart figures |
+| `frontend/` | React + TypeScript UI, Vite build |
 
 ---
 
@@ -258,18 +274,22 @@ ETL functions, which the UI does not touch. That means the built dataset is
 committed to the repo and the deployed app needs no credentials, no cron and
 no outbound access.
 
-On [Streamlit Community Cloud](https://share.streamlit.io), point a new app at
-this repo with:
+Build the frontend once, and the API serves it from its own origin — one
+process, no separate static host:
 
-| Setting | Value |
-|---|---|
-| Main file path | `app/Home.py` |
-| Python version | 3.13 |
+```bash
+cd frontend && npm ci && npm run build && cd ..
+.venv/Scripts/python -m uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
 
-`requirements.txt` at the repo root is picked up automatically, and
-`.streamlit/config.toml` carries the theme. Rebuilding the dataset is a local
-operation — re-run `build_dataset.py`, commit the new session directories and
-the updated `manifest.parquet`, and the deployment follows the push.
+`api/main.py` mounts `frontend/dist` only when it exists, and falls back to
+`index.html` for client-side routes so a hard refresh on `/corner-analysis`
+works. **Run a single worker:** the loaders in `api/cache.py` are per-process
+and one of them holds a decoded race telemetry frame (~74 MB).
+
+Rebuilding the dataset is a local operation — re-run `build_dataset.py`, commit
+the new session directories and the updated `manifest.parquet`, and the
+deployment follows the push.
 
 ---
 
