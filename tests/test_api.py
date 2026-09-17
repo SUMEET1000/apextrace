@@ -327,3 +327,32 @@ def test_chart_renders(chart_id, manifest):
     # Every figure goes through ``theme.apply``; losing the template is how a
     # chart silently reverts to Plotly's white default on a black page.
     assert figure["layout"].get("template"), f"{chart_id} lost the pitwall template"
+
+
+# --------------------------------------------------------------------------
+# Static file containment
+# --------------------------------------------------------------------------
+
+@pytest.mark.parametrize("attack", [
+    "/etc/passwd",
+    "C:/Windows/win.ini",
+    "../../../../requirements.txt",
+    "..%2f..%2f..%2frequirements.txt",
+])
+def test_the_spa_route_cannot_read_a_file_outside_the_build(attack):
+    """A path that escapes frontend/dist gets the shell, never the file.
+
+    `Path(base) / "/etc/passwd"` discards the base, so an absolute path walks
+    out without a single `..`. Containment is checked after resolving.
+    """
+    from api.main import _DIST
+
+    if not _DIST.is_dir():
+        pytest.skip("frontend/dist is not built, so the SPA route is not mounted.")
+
+    response = client.get(f"/{attack}")
+    assert response.status_code == 200
+    body = response.text
+    assert "root:" not in body, "served /etc/passwd"
+    assert "fastapi" not in body.lower(), "served requirements.txt"
+    assert "<html" in body.lower() or "<!doctype" in body.lower(), "not the SPA shell"

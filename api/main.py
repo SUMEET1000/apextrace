@@ -695,6 +695,8 @@ if _DIST.is_dir():
     from fastapi.responses import FileResponse  # noqa: E402
     from fastapi.staticfiles import StaticFiles  # noqa: E402
 
+    _DIST_REAL = _DIST.resolve()
+
     app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)
@@ -704,10 +706,13 @@ if _DIST.is_dir():
         ``/corner-analysis`` is a route the browser owns, not a file on disk,
         so a hard refresh there has to return the shell rather than a 404.
         """
-        candidate = _DIST / path
-        if path and candidate.is_file():
+        # Containment is checked after resolving, never by reading the string:
+        # `Path(base) / "/etc/passwd"` discards the base entirely, so an
+        # absolute path escapes without needing a single `..` in it.
+        candidate = (_DIST_REAL / path).resolve()
+        if path and candidate.is_relative_to(_DIST_REAL) and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(_DIST / "index.html")
+        return FileResponse(_DIST_REAL / "index.html")
 
 else:
     @app.get("/", include_in_schema=False)
