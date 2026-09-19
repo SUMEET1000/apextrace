@@ -7,7 +7,9 @@ numpy>=1.26,<3
 # still builds every figure with pitwall/viz and serves it as figure JSON,
 # which the browser renders with a version-matched plotly.js.
 plotly>=5.24
-statsmodels>=0.14
+# 0.15 moved the formula backend to formulaic and dropped the patsy
+# design_info that pitwall/evolution.py rebuilds its contrast matrix from.
+statsmodels>=0.14,<0.15
 # pitwall/evolution.py imports dmatrix directly, so patsy is a dependency of
 # this project and not only of statsmodels, which is moving off it.
 patsy>=0.5

@@ -438,6 +438,13 @@ def test_17_control_the_default_grid_size_round_trips(monkeypatch):
 # HTTP boundary
 # --------------------------------------------------------------------------
 
+def _require_session(client, slug: str) -> str:
+    """Skip when the dataset is absent, the contract tests/test_api.py uses."""
+    if client.get("/api/session", params={"slug": slug}).status_code == 404:
+        pytest.skip(f"{slug} is not in the manifest.")
+    return slug
+
+
 @pytest.mark.parametrize("value", ["nan", "inf", "-1"])
 def test_15_nonfinite_fuel_parameters_are_a_client_error(client, value):
     response = client.get("/api/race-arc",
@@ -446,8 +453,9 @@ def test_15_nonfinite_fuel_parameters_are_a_client_error(client, value):
 
 
 def test_15_control_a_finite_fuel_effect_is_served(client):
+    slug = _require_session(client, "2024/01_R")
     response = client.get("/api/race-arc",
-                          params={"slug": "2024/01_R", "fuel_effect": 0.032})
+                          params={"slug": slug, "fuel_effect": 0.032})
     assert response.status_code == 200, response.text[:200]
 
 
@@ -464,6 +472,7 @@ def test_16_control_a_numeric_chart_parameter_is_served(client):
 def test_32_charts_refuse_the_corner_data_the_analysis_endpoint_refuses(client,
                                                                        monkeypatch):
     """The 409 belongs to the shared input path, not to one endpoint."""
+    slug = _require_session(client, "2024/01_Q")
     broken = pd.DataFrame({"Number": [1, 2], "CornerLabel": ["1", "2"],
                            "Distance": [500.0, 500.0]})
     real = api_cache_load_artefact = __import__("api.cache", fromlist=["cache"]).load_artefact
@@ -474,7 +483,7 @@ def test_32_charts_refuse_the_corner_data_the_analysis_endpoint_refuses(client,
     monkeypatch.setattr("api.cache.load_artefact", fake)
     monkeypatch.setattr("api.charts.cache.load_artefact", fake)
     response = client.get("/api/chart/corner-delta-bars",
-                          params={"slug": "2024/01_Q", "driver1": "VER",
+                          params={"slug": slug, "driver1": "VER",
                                   "driver2": "LEC"})
     assert response.status_code == 409, response.text[:200]
 
