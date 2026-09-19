@@ -25,3 +25,10 @@ PLANS/
 # Logs and backups
 *.bak
 backfill.log
+
+# PDFs are personal reference copies, never project files
+*.pdf
+
+# Agent tool scratch directories
+.agents/
+.codex/

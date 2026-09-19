@@ -379,6 +379,15 @@ def resample_to_distance_grid(
     d, t = d[keep], t[keep]
     if len(d) < 2:
         raise ValueError("telemetry has no usable distance progression")
+    # The mask compares each sample with its predecessor in the original
+    # array, so a sample below an earlier peak survives it: [0,100,50,60,200]
+    # leaves [0,100,60,200]. np.interp requires an increasing axis and does
+    # not check, so the result would be silently undefined.
+    if not np.all(np.diff(d) > 0):
+        raise ValueError(
+            "telemetry distance is not monotonic after filtering; the lap has "
+            "a backwards jump larger than a single sample"
+        )
 
     covered = float(d[-1])
     rel = np.linspace(0.0, 1.0, n_points)
@@ -472,8 +481,16 @@ _SPEED_SCALE = 10.0   # 0.1 km/h
 _RPM_SCALE = 0.1      # 10 rpm
 _US_PER_S = 1_000_000
 
+# Time is quantised to 10 us rather than 1 us. At 1 us an int32 tops out at
+# 2147.5 s, and 2024/08_R (Monaco, red-flagged on lap 1) wrapped 17 laps to
+# -2147.5 s in the shipped dataset. 10 us moves the ceiling to 5.96 hours at
+# the same on-disk width - int64 microseconds would have cost +21.8% on the
+# telemetry file, measured 19 Sept 2026 on 2024/01_R.
+_TIME_UNITS_PER_S = 100_000
+_MAX_ENCODED_S = 2 ** 31 / _TIME_UNITS_PER_S
+
 _ENCODED_SCHEMA = {
-    "t_us": "int32",
+    "t_10us": "int32",
     "Speed_dq": "int16",
     "Throttle_pct": "int8",
     "RPM_dq": "int16",
@@ -496,7 +513,13 @@ def _fill(values: np.ndarray) -> np.ndarray:
 def encode_grid(frame: pd.DataFrame) -> pd.DataFrame:
     """Compact a gridded lap for storage. Inverse of :func:`decode_grid`."""
     out = pd.DataFrame(index=frame.index)
-    out["t_us"] = (_fill(frame["t"].to_numpy(dtype="float64")) * _US_PER_S).round().astype("int32")
+    seconds = _fill(frame["t"].to_numpy(dtype="float64"))
+    if np.abs(seconds).max(initial=0.0) >= _MAX_ENCODED_S:
+        raise ValueError(
+            f"telemetry spans {np.abs(seconds).max():.0f} s, beyond the "
+            f"{_MAX_ENCODED_S:.0f} s the stored int32 counter can hold"
+        )
+    out["t_10us"] = (seconds * _TIME_UNITS_PER_S).round().astype("int32")
     if "Speed" in frame:
         out["Speed_dq"] = (_fill(frame["Speed"].to_numpy()) * _SPEED_SCALE).round().astype("int16")
     if "Throttle" in frame:
@@ -519,7 +542,11 @@ def decode_grid(frame: pd.DataFrame, n_points: int = GRID_POINTS) -> pd.DataFram
     resampler produced.
     """
     out = frame.copy()
-    if "t_us" in out:
+    if "t_10us" in out:
+        out["t"] = out.pop("t_10us").astype("float64") / _TIME_UNITS_PER_S
+    elif "t_us" in out:
+        # Artefacts written before the 10 us change. 2024/08_R holds 17 laps
+        # that overflowed under this encoding and stay wrong until rebuilt.
         out["t"] = out.pop("t_us").astype("float64") / _US_PER_S
     if "Speed_dq" in out:
         out["Speed"] = out.pop("Speed_dq").astype("float32") / _SPEED_SCALE
@@ -597,7 +624,9 @@ def trim_to_track(
 
     pts = tel[["X", "Y"]].to_numpy(dtype="float64")
     dist, _ = cKDTree(track_xy).query(pts, k=1)
-    off = dist > max_offset_m
+    # Both arrays are raw FastF1 position units, so the query returns those
+    # too; the threshold is metres. Without the conversion 12 m acts as 1.2 m.
+    off = dist / POSITION_UNITS_PER_M > max_offset_m
     if not off.any():
         return tel
 
@@ -628,7 +657,21 @@ def delta_time(lap_a: pd.DataFrame, lap_b: pd.DataFrame) -> np.ndarray:
         raise ValueError(
             f"laps are on different grids: {len(lap_a)} vs {len(lap_b)} points"
         )
-    return lap_b["t"].to_numpy(dtype="float64") - lap_a["t"].to_numpy(dtype="float64")
+    t_a = lap_a["t"].to_numpy(dtype="float64")
+    t_b = lap_b["t"].to_numpy(dtype="float64")
+
+    # Each lap's clock starts at its own first stored sample, which for a
+    # partial lap is wherever its coverage begins rather than the start/finish
+    # line. Subtracting the raw arrays therefore charges one lap for track the
+    # other never drove: 2024/02_R showed a +54.2 s swing between a flying lap
+    # and an out-lap. Re-basing on the first point both laps cover makes the
+    # curve overlap-relative and starts it at zero. Two full laps already
+    # share grid point 0, so their delta is unchanged.
+    shared = np.flatnonzero(np.isfinite(t_a) & np.isfinite(t_b))
+    if not len(shared):
+        return np.full(len(t_a), np.nan)
+    origin = int(shared[0])
+    return (t_b - t_b[origin]) - (t_a - t_a[origin])
 
 
 def clean_laps(
@@ -665,6 +708,12 @@ def clean_laps(
 
     # A lap with no recorded time is unusable regardless of any other flag.
     df = _record("no lap time", df["LapTime"].notna())
+
+    if "Deleted" in df.columns:
+        # A lap the stewards took away is not a measurement of pace. Depends
+        # on ingest loading race-control messages; without them the flag is
+        # never set and this filter removes nothing.
+        df = _record("deleted by the stewards", ~df["Deleted"].eq(True))
 
     if require_accurate and "IsAccurate" in df.columns:
         # FastF1's own data-quality flag: timing is complete and consistent.
@@ -778,7 +827,10 @@ def telemetry_coverage(
 
     def _col(name: str) -> pd.Series:
         if name not in missing.columns:
-            return pd.Series(False, index=missing.index)
+            # Null, not False: these are read through .notna() and .eq(True),
+            # and a False series answers True to the first one - which
+            # labelled every unexplained lap an in-lap.
+            return pd.Series(pd.NA, index=missing.index, dtype="object")
         return missing[name]
 
     # A missing column yields an all-False mask, so a session lacking one of

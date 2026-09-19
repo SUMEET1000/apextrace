@@ -30,6 +30,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
+from patsy import dmatrix
+from scipy import stats
 
 # Degrees of freedom for the natural cubic spline on session progress. Four
 # knots can follow the fast early rubbering-in and the later plateau without
@@ -60,8 +62,6 @@ def fit_evolution(
         return None
 
     df = laps.dropna(subset=list(needed)).copy()
-    if len(df) < MIN_LAPS_FOR_MODEL or df["Driver"].nunique() < MIN_DRIVERS_FOR_MODEL:
-        return None
 
     total = int(total_laps or df["LapNumber"].max())
     df["progress"] = df["LapNumber"] / max(total, 1)
@@ -69,16 +69,30 @@ def fit_evolution(
     # Compounds with too few laps make the interaction term unstable.
     counts = df["Compound"].value_counts()
     df = df[df["Compound"].isin(counts[counts >= 10].index)]
-    if df.empty or df["Compound"].nunique() == 0:
+
+    # Checked after every filter, not before. Run first, the guard passed a
+    # 50-lap four-driver session that the compound filter then cut to 23 laps
+    # from one driver.
+    if (len(df) < MIN_LAPS_FOR_MODEL
+            or df["Driver"].nunique() < MIN_DRIVERS_FOR_MODEL
+            or df["Compound"].nunique() == 0):
         return None
 
+    # C(Compound) earns its place: without the main effect a constant pace
+    # difference between compounds has nowhere to go but the age slope, and a
+    # 2 s soft advantage turned two true 0.100 s/lap slopes into 0.179 and
+    # 0.031. With it, the interaction keeps full dummy coding, so each
+    # compound's coefficient is still its own absolute slope.
     formula = (
-        "LapTime_corrected_s ~ C(Driver) + C(Compound):TyreLife "
+        "LapTime_corrected_s ~ C(Driver) + C(Compound) + C(Compound):TyreLife "
         f"+ cr(progress, df={spline_df})"
     )
     try:
         model = smf.ols(formula, data=df).fit(cov_type="HC3")
     except Exception:  # noqa: BLE001 - degenerate session, fall back to no model
+        return None
+
+    if not _degradation_is_estimable(model):
         return None
 
     curve = _evolution_curve(model, df, spline_df=spline_df)
@@ -108,17 +122,59 @@ def _evolution_curve(model, df: pd.DataFrame, *, spline_df: int) -> pd.DataFrame
     grid["Compound"] = df["Compound"].mode().iloc[0]
     grid["TyreLife"] = 1.0
 
-    prediction = model.get_prediction(grid).summary_frame(alpha=0.05)
-    baseline = prediction["mean"].iloc[0]
+    # The plotted quantity is the contrast (x(t) - x(0))'beta, not x(t)'beta,
+    # so its variance is the contrast's own: c' Sigma c. Subtracting the
+    # baseline from an absolute prediction interval instead ignored the
+    # baseline's variance and its covariance with the rest of the curve, and
+    # put a +/-0.105 s band on a point that is identically zero.
+    design = np.asarray(dmatrix(model.model.data.design_info, grid,
+                                return_type="dataframe"), dtype="float64")
+    contrast = design - design[0]
+    mean = contrast @ model.params.to_numpy()
+    variance = np.einsum("ij,jk,ik->i", contrast,
+                         model.cov_params().to_numpy(), contrast)
+    half_width = (stats.t.ppf(0.975, model.df_resid)
+                  * np.sqrt(np.clip(variance, 0.0, None)))
 
     return pd.DataFrame({
         "progress": grid["progress"],
         # Negative = faster than at the start, so a falling line means the
         # track is improving.
-        "evolution_s": prediction["mean"].to_numpy() - baseline,
-        "ci_low": prediction["mean_ci_lower"].to_numpy() - baseline,
-        "ci_high": prediction["mean_ci_upper"].to_numpy() - baseline,
+        "evolution_s": mean,
+        "ci_low": mean - half_width,
+        "ci_high": mean + half_width,
     })
+
+
+# Below this share of a slope column's variance left after projecting out the
+# rest of the design, the coefficient is a pseudoinverse artefact rather than a
+# measurement. It is a numerical-zero test, not a tuned threshold: real races
+# measure 0.16-0.67 here (VIF 1.5-6.1, 19 Sept 2026) and an aliased design
+# measures ~1e-31.
+MIN_SLOPE_TOLERANCE = 1e-8
+
+
+def _degradation_is_estimable(model) -> bool:
+    """Whether the compound age slopes are separable from the rest of the fit.
+
+    Tyre age and session progress only come apart because drivers pit at
+    different times. Where they do not - a single-stint session, or one whose
+    TyreLife tracks LapNumber - the design loses rank, and OLS answers from a
+    pseudoinverse rather than failing. That reports a confident arbitrary split
+    of one trend into two, with a zero-width confidence interval beside it.
+    """
+    exog = np.asarray(model.model.exog, dtype="float64")
+    for i, name in enumerate(model.params.index):
+        if ":TyreLife" not in name:
+            continue
+        column = exog[:, i]
+        others = np.delete(exog, i, axis=1)
+        beta, *_ = np.linalg.lstsq(others, column, rcond=None)
+        residual = column - others @ beta
+        total = float(((column - column.mean()) ** 2).sum())
+        if total <= 0 or float(residual @ residual) / total < MIN_SLOPE_TOLERANCE:
+            return False
+    return True
 
 
 def _compound_degradation(model) -> pd.DataFrame:
@@ -128,7 +184,11 @@ def _compound_degradation(model) -> pd.DataFrame:
     for name in model.params.index:
         if ":TyreLife" not in name:
             continue
-        compound = name.split("[T.")[-1].split("]")[0] if "[T." in name else name
+        # "C(Compound)[HARD]:TyreLife" under full dummy coding,
+        # "C(Compound)[T.HARD]:TyreLife" under treatment coding.
+        if "[" not in name:
+            continue
+        compound = name.split("[")[-1].split("]")[0].removeprefix("T.")
         rows.append({
             "Compound": compound,
             "deg_s_per_lap": float(model.params[name]),
@@ -171,11 +231,21 @@ def session_best_progression(laps: pd.DataFrame) -> pd.DataFrame:
     if laps.empty or "LapStartTime" not in laps.columns:
         return pd.DataFrame()
     df = laps.dropna(subset=["LapTime", "LapStartTime"]).copy()
+    if "Deleted" in df.columns:
+        # clean_laps does not run here - this reads the raw lap table - so the
+        # same policy has to be applied again, or a lap the stewards took away
+        # becomes the advertised session record.
+        df = df[~df["Deleted"].eq(True)]
     if df.empty:
         return pd.DataFrame()
-    df = df.sort_values("LapStartTime")
+
+    # A record exists when the lap crosses the line, not when it starts. On
+    # start order the chart showed the record up to 137 s early in every one
+    # of the 75 stored qualifying sessions (measured 19 Sept 2026).
+    df["lap_finish"] = df["LapStartTime"] + df["LapTime"]
+    df = df.sort_values("lap_finish")
     df["session_minutes"] = (
-        df["LapStartTime"] - df["LapStartTime"].min()
+        df["lap_finish"] - df["LapStartTime"].min()
     ).dt.total_seconds() / 60.0
     df["lap_time_s"] = df["LapTime"].dt.total_seconds()
     df["session_best_s"] = df["lap_time_s"].cummin()

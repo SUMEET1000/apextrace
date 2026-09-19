@@ -87,8 +87,19 @@ def _lap_telemetry(lap) -> tuple[pd.DataFrame | None, bool]:
     try:
         tel = lap.get_telemetry()
         if tel is not None and {"X", "Y"}.issubset(tel.columns):
-            stale = stale_position_fraction(tel)
-            if stale > MAX_STALE_POSITION_FRACTION:
+            # Finiteness first. Both stale_position_fraction and
+            # distance_from_position answer "cannot tell" with 0.0 and an
+            # unchanged frame on non-finite coordinates, so a NaN position
+            # scored 0% stale and was accepted as healthy - and trim_to_track
+            # then fed NaN to a KD-tree query.
+            finite = np.isfinite(
+                tel[["X", "Y"]].to_numpy(dtype="float64")).all()
+            stale = stale_position_fraction(tel) if finite else 1.0
+            if not finite:
+                log.debug("%s lap %s: position feed has non-finite "
+                          "coordinates, using car data alone",
+                          lap.get("Driver"), lap.get("LapNumber"))
+            elif stale > MAX_STALE_POSITION_FRACTION:
                 # The position feed is frozen for this lap - present, but
                 # re-sending stale coordinates. Everything it would be used
                 # for (arc length, the track map, pit-lane trimming) would be
@@ -184,7 +195,12 @@ def load_session(
                 laps=True,
                 telemetry=telemetry,
                 weather=True,
-                messages=False,
+                # Race-control messages are where FastF1 gets the Deleted
+                # flag from. With them off the column was written for every
+                # lap and was False on all 161,941 of them, so both the
+                # extract filter below and clean_laps were filtering on a
+                # flag nothing could ever set (measured 19 Sept 2026).
+                messages=True,
             )
             return session
         except fastf1.RateLimitExceededError as exc:
@@ -733,6 +749,12 @@ def session_metadata(session, key: SessionKey) -> dict:
         "n_drivers": int(laps["Driver"].nunique()) if len(laps) else 0,
         "n_laps": int(len(laps)),
         "total_laps": total_laps,
+        # Only sessions built with messages=True can have this at all, so the
+        # column's presence says the Deleted flags are real and its value says
+        # how many there were. Without it, a session with no deletions and one
+        # that was never asked look identical.
+        "n_deleted_laps": (int(laps["Deleted"].eq(True).sum())
+                           if len(laps) and "Deleted" in laps.columns else 0),
     }
 
 

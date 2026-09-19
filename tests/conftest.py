@@ -16,6 +16,13 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from pitwall.config import POSITION_UNITS_PER_M  # noqa: E402
+
+
+def _radius_units(lap_length: float) -> float:
+    """Radius of a circular circuit of ``lap_length`` metres, in position units."""
+    return lap_length / (2 * np.pi) * POSITION_UNITS_PER_M
+
 
 def make_lap(
     *,
@@ -66,8 +73,13 @@ def make_lap(
         "Brake": brake,
         "nGear": np.clip((speed / 40).astype(int), 1, 8),
         "DRS": np.where(speed > 300, 12, 0),
-        "X": np.cos(2 * np.pi * d / lap_length) * 1000,
-        "Y": np.sin(2 * np.pi * d / lap_length) * 1000,
+        # A circle of the right circumference, on FastF1's own coordinate
+        # scale: X/Y are tenths of a metre, so an offset in metres only means
+        # what it says after dividing by config.POSITION_UNITS_PER_M. A fixed
+        # 1000-unit radius put the fixture at 1.26 units per metre and hid
+        # exactly that conversion.
+        "X": np.cos(2 * np.pi * d / lap_length) * _radius_units(lap_length),
+        "Y": np.sin(2 * np.pi * d / lap_length) * _radius_units(lap_length),
         "Z": np.zeros_like(d),
     })
 

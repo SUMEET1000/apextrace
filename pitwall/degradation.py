@@ -165,8 +165,21 @@ def compound_summary(stints: pd.DataFrame) -> pd.DataFrame:
             "n_stints": int(len(group)),
             "n_laps": int(group["n_laps"].sum()),
             "median_pace_s": float(group["pace_s"].median()),
+            # Pooled the same way as the slope, so compound paces can be
+            # compared at a common tyre age rather than at whatever age each
+            # compound happened to be driven at. See compound_offsets.
+            "intercept_s": (float((group["intercept_s"] * weights).sum() / weights.sum())
+                            if "intercept_s" in group.columns else np.nan),
             "n_with_cliff": int(group["has_cliff"].sum()),
         })
+
+    if not rows:
+        # Every group failed the usable-uncertainty filter. That is an empty
+        # answer, not an error, so it returns the same columns as a full one.
+        return pd.DataFrame(columns=[
+            "Compound", "deg_s_per_lap", "ci_low", "ci_high", "std_err",
+            "n_stints", "n_laps", "median_pace_s", "intercept_s", "n_with_cliff",
+        ])
 
     out = pd.DataFrame(rows)
     out["_order"] = out["Compound"].map(
@@ -175,17 +188,46 @@ def compound_summary(stints: pd.DataFrame) -> pd.DataFrame:
     return out.sort_values("_order").drop(columns="_order").reset_index(drop=True)
 
 
-def compound_offsets(summary: pd.DataFrame) -> pd.DataFrame:
-    """Pace offset between compounds, measured from the hardest available.
+def compound_offsets(summary: pd.DataFrame,
+                     *, reference_age: float | None = None) -> pd.DataFrame:
+    """Pace offset between compounds at a common tyre age.
 
     This is the number a strategist trades against pit loss: how much lap time
-    a softer tyre is worth when new.
+    a softer tyre is worth. The comparison has to be made at the same age,
+    because each compound's median pace is measured at whatever age it
+    happened to be driven at, and those differ - by up to 23 laps across the
+    stored races, which moves an offset by up to 1.15 s in the dry and 2.92 s
+    in the wet (measured 19 Sept 2026). That is the size of the offsets
+    themselves, so the raw difference can be entirely age.
+
+    ``reference_age`` defaults to the median age the compounds were actually
+    observed at, keeping the answer inside the data. Falls back to the raw
+    median difference when the summary carries no slope to adjust with.
     """
     if summary.empty or len(summary) < 2:
         return pd.DataFrame()
-    baseline = summary["median_pace_s"].max()
+
     out = summary[["Compound", "median_pace_s"]].copy()
-    out["offset_s"] = out["median_pace_s"] - baseline
+    pace = out["median_pace_s"].to_numpy(dtype="float64")
+
+    if {"deg_s_per_lap", "intercept_s"}.issubset(summary.columns):
+        deg = summary["deg_s_per_lap"].to_numpy(dtype="float64")
+        intercept = summary["intercept_s"].to_numpy(dtype="float64")
+        # The age each compound's median pace corresponds to, read off its own
+        # fitted line. A flat compound carries no age information, so it is
+        # left out of the reference rather than dividing by ~zero.
+        with np.errstate(divide="ignore", invalid="ignore"):
+            observed_age = np.where(np.abs(deg) > 1e-9,
+                                    (pace - intercept) / deg, np.nan)
+        age = (float(reference_age) if reference_age is not None
+               else float(np.nanmedian(observed_age)) if np.isfinite(observed_age).any()
+               else np.nan)
+        if np.isfinite(age):
+            pace = intercept + deg * age
+            out["tyre_age_laps"] = age
+
+    out["pace_at_age_s"] = pace
+    out["offset_s"] = pace - pace.max()
     return out.reset_index(drop=True)
 
 

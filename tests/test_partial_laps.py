@@ -128,7 +128,9 @@ def _with_pit_lane(side: str) -> tuple[pd.DataFrame, np.ndarray]:
     track_xy = lap[["X", "Y"]].to_numpy(dtype="float64")
     n_pit = 60
     idx = slice(0, n_pit) if side == "lead" else slice(-n_pit, None)
-    push = 1 + (PIT_LANE_OFFSET_M * 4) / 1000.0
+    # Four times the threshold, in metres, off a circuit of this radius.
+    radius_m = TRACK_LENGTH / (2 * np.pi)
+    push = 1 + (PIT_LANE_OFFSET_M * 4) / radius_m
     lap.loc[lap.index[idx], ["X", "Y"]] *= push
     return lap, track_xy
 

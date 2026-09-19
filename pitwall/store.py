@@ -44,7 +44,26 @@ def read_artefact(key: SessionKey, name: str) -> pd.DataFrame:
     return pd.read_parquet(path)
 
 
-def read_telemetry(key: SessionKey, n_points: int = GRID_POINTS) -> pd.DataFrame:
+def stored_grid_points(raw: pd.DataFrame) -> int:
+    """How many grid points a stored telemetry frame actually uses.
+
+    Read from the rows rather than from the manifest or a constant: every lap
+    occupies exactly one grid, so the row count per lap is the grid size and
+    cannot go stale. ``--grid-points 500`` was decoded at the 1000-point
+    default, which put a complete lap's last sample at RelDistance 0.4995.
+    """
+    if raw.empty or not {"Driver", "LapNumber"}.issubset(raw.columns):
+        return GRID_POINTS
+    sizes = set(raw.groupby(["Driver", "LapNumber"], observed=True).size().unique())
+    if len(sizes) != 1:
+        raise ValueError(
+            f"stored laps are not all the same length: found {sorted(sizes)} "
+            "rows per lap, so the grid size cannot be determined"
+        )
+    return int(sizes.pop())
+
+
+def read_telemetry(key: SessionKey, n_points: int | None = None) -> pd.DataFrame:
     """Stored telemetry, decoded back into physical units.
 
     Callers should use this rather than ``read_artefact(key, "telemetry")``,
@@ -53,7 +72,8 @@ def read_telemetry(key: SessionKey, n_points: int = GRID_POINTS) -> pd.DataFrame
     raw = read_artefact(key, "telemetry")
     if raw.empty:
         return raw
-    return decode_grid(raw, n_points=n_points)
+    return decode_grid(raw, n_points=n_points if n_points is not None
+                       else stored_grid_points(raw))
 
 
 _TIMEDELTA_COLUMNS = (

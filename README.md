@@ -69,14 +69,27 @@ for another. Pooling all drivers decorrelates tyre age from session time and
 makes both separately estimable:
 
 ```
-corrected_laptime ~ C(Driver) + C(Compound):TyreLife + cr(progress, df=4)
+corrected_laptime ~ C(Driver) + C(Compound) + C(Compound):TyreLife + cr(progress, df=4)
 ```
 
 | Term | What it absorbs |
 |---|---|
 | `C(Driver)` | raw pace differences between cars |
+| `C(Compound)` | how quick each tyre is when new, independent of its age |
 | `C(Compound):TyreLife` | degradation, allowed to differ per compound |
 | `cr(progress, df=4)` | natural cubic spline on session progress — **this is track evolution** |
+
+The compound main effect is not decoration. Without it a constant pace
+difference between tyres has nowhere to go but the age slope: on a noiseless
+fixture where both compounds truly degrade at 0.100 s/lap, a 2 s soft-tyre
+advantage alone moves the estimates to 0.179 and 0.031.
+
+The decomposition is only reported when it is actually identified. Where tyre
+age and session progress cannot be told apart — a single-stint session, or one
+where every tyre ages with the race — OLS still answers, from a pseudoinverse,
+with a confident arbitrary split. The fit is refused instead. Across the stored
+races the two carry a variance inflation factor of 1.5–6.1, against a
+conventional alarm threshold of 10.
 
 Fuel is removed *beforehand* rather than fitted, because fuel load is almost a
 perfect linear function of lap number and would otherwise be swallowed by the
@@ -86,12 +99,17 @@ evolution term.
 
 | Method | Track evolution |
 |---|---|
-| Pooled model (tyre + fuel removed) | **+0.292 s** — the circuit got faster |
-| Naive trend through lap times | **−1.053 s** — the circuit got *slower* |
+| Pooled model (tyre + fuel removed) | **+0.372 s** — the circuit got faster |
+| Naive trend through lap times | **−1.013 s** — the circuit got *slower* |
 
 The naive estimate does not merely misstate the size. It gets the **direction
-wrong**, because degradation dominates the raw lap times. Model R² = 0.783
-across 1,006 clean laps and 20 drivers.
+wrong**, because degradation dominates the raw lap times. Model R² = 0.780
+across 988 clean laps and 20 drivers.
+
+The band drawn around that curve is an interval for the curve itself — the
+contrast between each point and the session start, with its own variance taken
+from the fitted covariance matrix. It is therefore exactly zero wide at the
+start, where the plotted quantity is a number minus itself.
 
 Two independent checks that the model is doing what it claims:
 

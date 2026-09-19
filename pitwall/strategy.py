@@ -87,20 +87,28 @@ def pit_loss(laps: pd.DataFrame) -> dict:
     # very different amounts of the loss - the in-lap only gives up the run to
     # pit entry, while the out-lap absorbs the stationary time and the exit -
     # so pooling them and doubling the median badly understates the total.
-    in_excess = _excess(is_in)
-    out_excess = _excess(is_out)
-    if not len(in_excess) and not len(out_excess):
+    # A short pit visit can put entry and exit on the same lap. That lap holds
+    # the whole loss once, so counting it in both medians doubled it: the
+    # stored races reach 107.05 s against 58.60 s on 2024/06_Sprint, against a
+    # true pit loss near 23 s (measured 19 Sept 2026).
+    is_both = is_in & is_out
+    in_excess = _excess(is_in & ~is_both)
+    out_excess = _excess(is_out & ~is_both)
+    both_excess = _excess(is_both)
+    if not len(in_excess) and not len(out_excess) and not len(both_excess):
         return {}
 
     in_median = float(np.median(in_excess)) if len(in_excess) else 0.0
     out_median = float(np.median(out_excess)) if len(out_excess) else 0.0
+    both_median = float(np.median(both_excess)) if len(both_excess) else 0.0
 
     return {
-        "pit_loss_s": in_median + out_median,
+        "pit_loss_s": in_median + out_median + both_median,
         "in_lap_s": in_median,
         "out_lap_s": out_median,
         "n_in_laps": int(len(in_excess)),
         "n_out_laps": int(len(out_excess)),
+        "n_same_lap": int(len(both_excess)),
         "n_stops": int(is_in.sum()),
     }
 
@@ -142,9 +150,10 @@ def head_to_head(laps: pd.DataFrame, driver_a: str, driver_b: str) -> pd.DataFra
     time, so a head-to-head over the full session is available where a
     corner-level comparison is not.
 
-    Laps only one driver completed keep their own time and score no delta.
-    A retirement or a lapped car must not silently register as a gain, so
-    those laps contribute nothing to the cumulative figure.
+    Laps only one driver completed keep their own time and score no delta,
+    and the running total goes unknown from there. Filling the gap with zero
+    instead would state that neither driver gained anything on a lap nobody
+    measured, and that claim then rides in every later value.
     """
     if laps.empty or not {"Driver", "LapNumber"}.issubset(laps.columns):
         return pd.DataFrame()
@@ -188,9 +197,9 @@ def head_to_head(laps: pd.DataFrame, driver_a: str, driver_b: str) -> pd.DataFra
 
     out = a.merge(b, on="LapNumber", how="outer").sort_values("LapNumber")
     out["delta_s"] = out["LapTime_s_b"] - out["LapTime_s_a"]
-    # Uncomparable laps contribute zero rather than breaking the series: the
-    # gap simply does not move on a lap that cannot be scored.
-    out["cumulative_s"] = out["delta_s"].fillna(0.0).cumsum()
+    # An unscored lap makes every later total unknown, so the series stops
+    # rather than carrying an invented value forward.
+    out["cumulative_s"] = out["delta_s"].cumsum(skipna=False)
     # eq(True) rather than fillna: the outer merge leaves NaN on laps only one
     # driver ran, and fillna on an object column is a deprecated downcast.
     for suffix in ("a", "b"):
@@ -207,8 +216,14 @@ def gap_evolution(laps: pd.DataFrame) -> pd.DataFrame:
     df = laps.copy()
     df["lap_time_s"] = (df["LapTime"].dt.total_seconds()
                         if "LapTime" in df.columns else df.get("LapTime_s"))
-    df = df.dropna(subset=["lap_time_s"]).sort_values(["Driver", "LapNumber"])
-    df["elapsed_s"] = df.groupby("Driver", observed=True)["lap_time_s"].cumsum()
+    df = df.sort_values(["Driver", "LapNumber"])
+    # Untimed laps are kept and the NaN is allowed to propagate. Dropping them
+    # and summing the rest treated a driver's remaining laps as consecutive,
+    # so one missing lap understated their elapsed time by a whole lap - and
+    # could hand them the lead. 2024/05_R understates VER, PER and LEC by
+    # about 300 s each (measured 19 Sept 2026). A driver whose elapsed time is
+    # unknown also drops out of the leader minimum, which skipna does for free.
+    df["elapsed_s"] = df.groupby("Driver", observed=True)["lap_time_s"].cumsum(skipna=False)
 
     leader = df.groupby("LapNumber", observed=True)["elapsed_s"].min().rename("leader_s")
     df = df.merge(leader, on="LapNumber", how="left")

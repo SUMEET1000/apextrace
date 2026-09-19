@@ -199,9 +199,13 @@ def evolution_with_temperature(curve: pd.DataFrame, weather: pd.DataFrame,
     ), row=1, col=1)
 
     if has_weather:
+        # The span is measured before the drop. Taken after it, a missing
+        # first reading moved every surviving observation along the axis -
+        # a reading at 60 s of a 120 s session jumped from 50% to 0%.
+        origin = weather["Time_s"].min()
+        span = weather["Time_s"].max() - origin
         w = weather.dropna(subset=["TrackTemp"]).copy()
-        span = w["Time_s"].max() - w["Time_s"].min()
-        w["progress"] = (w["Time_s"] - w["Time_s"].min()) / (span if span else 1)
+        w["progress"] = (w["Time_s"] - origin) / (span if span else 1)
         fig.add_trace(go.Scatter(
             x=w["progress"], y=w["TrackTemp"], mode="lines",
             name="Track temp", line=dict(color=theme.SERIES[3], width=2),
@@ -265,15 +269,20 @@ def stint_chart(stints: pd.DataFrame, *, height: int = 640) -> go.Figure:
     seen: set[str] = set()
     for row in stints.itertuples():
         compound = str(row.Compound)
+        # Width is the stint's lap extent, not how many of its laps the
+        # timing feed happened to report. Using the count drew a stint
+        # observed on laps 1,2,4,5 as ending at 4, contradicting the hover
+        # text beneath it.
+        extent = row.end_lap - row.start_lap + 1
         fig.add_trace(go.Bar(
-            y=[row.Driver], x=[row.laps], base=[row.start_lap - 1],
+            y=[row.Driver], x=[extent], base=[row.start_lap - 1],
             orientation="h", name=compound,
             legendgroup=compound, showlegend=compound not in seen,
             marker=dict(color=theme.compound_colour(compound),
                         line=dict(color=theme.SURFACE, width=2)),
             # Compound named in text on the bar, so the reading never depends
             # on telling two official tyre colours apart.
-            text=compound[0] if row.laps >= 4 else "",
+            text=compound[0] if extent >= 4 else "",
             textposition="inside", insidetextanchor="middle",
             textfont=dict(color=theme.SURFACE, size=10),
             hovertemplate=(f"<b>{row.Driver}</b><br>{compound}<br>"

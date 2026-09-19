@@ -542,11 +542,20 @@ def get_corner_analysis(
 # Race arc
 # --------------------------------------------------------------------------
 
+# Bounds for the two fuel sliders. They are wide enough to hold anything the
+# UI can send and anything a season could plausibly use, and narrow enough to
+# refuse a request rather than serve it: a bare `float` accepted "nan" and
+# "inf", which fell through the fuel correction into a 500.
+MAX_FUEL_EFFECT_S_PER_KG = 1.0
+MAX_FUEL_KG = 200.0
+
+
 @app.get("/api/race-arc")
 def get_race_arc(
     slug: str = Query(...),
-    fuel_effect: float = Query(config.FUEL_EFFECT_S_PER_KG),
-    fuel_kg: float | None = Query(None),
+    fuel_effect: float = Query(config.FUEL_EFFECT_S_PER_KG,
+                               ge=0.0, le=MAX_FUEL_EFFECT_S_PER_KG),
+    fuel_kg: float | None = Query(None, gt=0.0, le=MAX_FUEL_KG),
 ):
     _session_key(slug)
     meta = _meta(slug)

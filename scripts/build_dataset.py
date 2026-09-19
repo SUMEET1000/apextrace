@@ -35,6 +35,18 @@ from pitwall.ingest import SessionKey  # noqa: E402
 log = logging.getLogger("build_dataset")
 
 
+def _in_manifest(key: SessionKey) -> bool:
+    """Whether the manifest already describes this session.
+
+    Artefacts are written before the caller records the manifest row, so an
+    interrupted run can leave complete files with no metadata. Skipping on the
+    files alone meant that session was never repaired and the API could not
+    discover it.
+    """
+    manifest = store.read_manifest()
+    return not manifest.empty and key.slug in set(manifest["slug"].astype(str))
+
+
 def build_session(key: SessionKey, *, force: bool, n_points: int,
                   laps_per_driver: int | None = None) -> tuple[str, dict | None]:
     """Extract and persist one session's artefacts.
@@ -46,7 +58,7 @@ def build_session(key: SessionKey, *, force: bool, n_points: int,
     removes a session from the app's picker. The parent process owns that
     write, so it stays serialised no matter how many workers are running.
     """
-    if not force and store.session_is_complete(key):
+    if not force and store.session_is_complete(key) and _in_manifest(key):
         return "skipped (already built)", None
 
     session = ingest.load_session(key, telemetry=True)
@@ -134,7 +146,13 @@ def _run_sequential(targets: list[SessionKey], args) -> tuple[int, int, int]:
             # session would fail too. Stop cleanly and tell the user how to
             # resume - the dataset is built to be restartable.
             log.warning("%s  %s", prefix, exc)
-            log.info("stopping early with %d session(s) built this run", ok)
+            # Every target from here on is unattempted, not skipped. Counting
+            # them as neither made a run that built nothing return (0, 0, 0),
+            # which main() turned into exit code 0 - so automation read an
+            # interrupted dataset build as a successful one.
+            failed += len(targets) - i + 1
+            log.info("stopping early with %d session(s) built this run, "
+                     "%d not attempted", ok, len(targets) - i + 1)
             break
         except Exception as exc:  # noqa: BLE001 - one bad session must not stop a backfill
             failed += 1
@@ -179,9 +197,12 @@ def _run_parallel(targets: list[SessionKey], args) -> tuple[int, int, int]:
                 # workers cannot be recalled - cancel everything not yet
                 # started and let the running ones finish.
                 log.warning("%s  %s", prefix, exc)
-                for pending in futures:
-                    pending.cancel()
-                log.info("stopping early with %d session(s) built this run", ok)
+                # Same accounting as the sequential path: cancelled work is
+                # unattempted, and the run must not exit zero on it.
+                cancelled = sum(1 for pending in futures if pending.cancel())
+                failed += cancelled + 1
+                log.info("stopping early with %d session(s) built this run, "
+                         "%d cancelled", ok, cancelled)
                 break
             except CancelledError:
                 skipped += 1
@@ -255,7 +276,9 @@ def main() -> int:
     manifest = store.read_manifest()
     if not manifest.empty:
         log.info("manifest now holds %d session(s)", len(manifest))
-    return 1 if failed and not ok else 0
+    # Any incomplete work is a failed run. Requiring "failed and not ok" let a
+    # mixed result exit zero, which is the same lie in a smaller form.
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

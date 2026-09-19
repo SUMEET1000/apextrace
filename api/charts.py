@@ -17,13 +17,14 @@ here, or traces silently fail to render. See ``frontend/package.json``.
 
 from __future__ import annotations
 
+import math
 from typing import Any, Callable
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from api import cache
 from pitwall import config, evolution, store, strategy
-from pitwall.corners import compare_corners
+from pitwall.corners import compare_corners, corner_data_issues
 from pitwall.strategy import head_to_head
 from pitwall.viz import charts as viz_charts
 from pitwall.viz import traces as viz_traces
@@ -36,12 +37,43 @@ router = APIRouter()
 # Shared input resolution
 # --------------------------------------------------------------------------
 
+def _number(params: dict[str, str], name: str, default: float) -> float:
+    """A finite float from a query string, or 400 with the offending value.
+
+    float() on raw query text raised ValueError for "oops" and accepted
+    "nan"/"inf", so a malformed public request reached the analysis and came
+    back as a 500 rather than a client error.
+    """
+    raw = params.get(name)
+    if raw in (None, "", "null"):
+        return float(default)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, f"{name} must be a number, got {raw!r}") from None
+    if not math.isfinite(value):
+        raise HTTPException(400, f"{name} must be finite, got {raw!r}")
+    return value
+
+
 def _laps_for_comparison(slug: str, params: dict[str, str]):
     """The two selected laps plus the segment tiling, as the pages resolve them."""
     driver_a = params.get("driver1")
     driver_b = params.get("driver2")
     if not driver_a or not driver_b:
         raise HTTPException(400, "driver1 and driver2 are required")
+
+    # The same refusal /api/corner-analysis makes, in the path both share.
+    # Enforced on one endpoint only, a chart built from markers the analysis
+    # had already declared unusable still rendered with a 200.
+    issues = corner_data_issues(cache.load_artefact(slug, "corners"))
+    if issues:
+        raise HTTPException(
+            409,
+            "Corner analysis is unavailable for this session because "
+            + "; ".join(issues)
+            + ". Lap times, strategy and degradation are unaffected.",
+        )
 
     telemetry = cache.load_telemetry(slug)
     if telemetry.empty:
@@ -81,8 +113,8 @@ def _race_arc_inputs(slug: str, params: dict[str, str]):
     year = int(row.iloc[0]["year"])
     total_laps = int(row.iloc[0]["total_laps"])
 
-    fuel_effect = float(params.get("fuel_effect") or config.FUEL_EFFECT_S_PER_KG)
-    fuel_kg = float(params.get("fuel_kg") or config.race_fuel_kg(year))
+    fuel_effect = _number(params, "fuel_effect", config.FUEL_EFFECT_S_PER_KG)
+    fuel_kg = _number(params, "fuel_kg", config.race_fuel_kg(year))
 
     prepared, _ = cache.load_prepared(slug, year, total_laps, fuel_effect, fuel_kg)
     stints, summary = cache.load_stint_fits(
@@ -195,11 +227,11 @@ def _position_chart(slug: str, p: dict[str, str]):
 
 
 def _undercut_chart(slug: str, p: dict[str, str]):
-    gap_s = float(p.get("gap_s") or 1.5)
+    gap_s = _number(p, "gap_s", 1.5)
     table = strategy.undercut_gain(
         gap_to_rival_s=gap_s,
-        fresh_tyre_advantage_s=float(p.get("advantage") or 0.8),
-        deg_s_per_lap=float(p.get("deg_rate") or 0.10),
+        fresh_tyre_advantage_s=_number(p, "advantage", 0.8),
+        deg_s_per_lap=_number(p, "deg_rate", 0.10),
     )
     return viz_charts.undercut_chart(table, gap_s)
 

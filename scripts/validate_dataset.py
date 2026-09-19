@@ -89,6 +89,24 @@ def check_session(slug: str, meta: pd.Series) -> list[tuple[str, str]]:
         if speed.min() < 0 or speed.max() > 400:
             fail(f"implausible speeds: {speed.min():.0f}–{speed.max():.0f} km/h")
 
+        # Elapsed time inside a covered span runs forward from zero. Nulls,
+        # range and duration were all checked and ordering was not, so the
+        # int32 overflow that wrote -2147.5 s into 17 laps of 2024/08_R
+        # passed this validator unremarked.
+        keys = ["Driver", "LapNumber"]
+        covered_rows = telemetry[covered]
+        per_lap = covered_rows.groupby(keys, observed=True)["t"]
+        negative = per_lap.min() < 0
+        if negative.any():
+            fail(f"{int(negative.sum())} lap(s) carry negative elapsed telemetry time")
+        # One grouped diff rather than a Python call per lap: the dataset holds
+        # about 160,000 laps, and the per-lap version dominated a full sweep.
+        steps = per_lap.diff()
+        backwards = steps.lt(0).groupby([covered_rows[k] for k in keys],
+                                        observed=True).any()
+        if backwards.any():
+            fail(f"{int(backwards.sum())} lap(s) have telemetry time that runs backwards")
+
         full_only = telemetry
         if "LapKind" in telemetry.columns:
             full_only = telemetry[telemetry["LapKind"].astype(str) == LAP_KIND_FLYING]

@@ -42,21 +42,27 @@ def main() -> int:
         print("npm is not on PATH; install Node.js to run the frontend.")
         return 1
 
-    api = subprocess.Popen(
-        [str(VENV_PYTHON), "-m", "uvicorn", "api.main:app",
-         "--host", "127.0.0.1", "--port", "8000", "--reload"],
-        cwd=str(REPO_ROOT),
-    )
-    web = subprocess.Popen([npm, "run", "dev"], cwd=str(FRONTEND), shell=False)
-
-    print("\nApexTrace is starting")
-    print("  App      http://localhost:5173")
-    print("  API docs http://localhost:8000/docs")
-    print("\nCtrl+C to stop both.\n")
-
+    started: list[subprocess.Popen] = []
     try:
+        # Both launches sit inside the cleanup block. Starting the API before
+        # it meant a frontend that failed to launch left a reload server
+        # holding port 8000, which the next start then could not bind.
+        api = subprocess.Popen(
+            [str(VENV_PYTHON), "-m", "uvicorn", "api.main:app",
+             "--host", "127.0.0.1", "--port", "8000", "--reload"],
+            cwd=str(REPO_ROOT),
+        )
+        started.append(api)
+        web = subprocess.Popen([npm, "run", "dev"], cwd=str(FRONTEND), shell=False)
+        started.append(web)
+
+        print("\nApexTrace is starting")
+        print("  App      http://localhost:5173")
+        print("  API docs http://localhost:8000/docs")
+        print("\nCtrl+C to stop both.\n")
+
         # Whichever process exits first ends the session. Leaving the other
-        # running would hold its port and quietly break the next start — which
+        # running would hold its port and quietly break the next start - which
         # is exactly how a stale server ends up serving code you have replaced.
         while True:
             for process in (api, web):
@@ -69,10 +75,10 @@ def main() -> int:
     except KeyboardInterrupt:
         return 0
     finally:
-        for process in (web, api):
+        for process in reversed(started):
             if process.poll() is None:
                 process.terminate()
-        for process in (web, api):
+        for process in reversed(started):
             try:
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:

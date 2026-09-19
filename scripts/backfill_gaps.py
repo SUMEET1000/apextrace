@@ -95,7 +95,10 @@ def expected_sessions(years: list[int]) -> pd.DataFrame:
                     "event_name": str(event.get("EventName", "")),
                     "format": fmt,
                 })
-    return pd.DataFrame(rows)
+    # Fixed schema, so a season with nothing held yet can still be filtered
+    # by session instead of raising KeyError on a columnless frame.
+    return pd.DataFrame(rows, columns=["year", "round", "session",
+                                       "event_name", "format"])
 
 
 def find_gaps(years: list[int], sessions: list[str] | None) -> pd.DataFrame:
@@ -108,9 +111,15 @@ def find_gaps(years: list[int], sessions: list[str] | None) -> pd.DataFrame:
     if manifest.empty:
         return expected.reset_index(drop=True)
 
-    have = set(zip(manifest["year"].astype(int),
-                   manifest["round"].astype(int),
-                   manifest["session"].astype(str)))
+    # Listed is not the same as built. A session whose artefacts were deleted
+    # or half-copied keeps its manifest row, and trusting the row alone meant
+    # the repair pass could never queue it - the mirror image of the orphaned
+    # row build_dataset can leave behind.
+    have = {
+        (int(r.year), int(r.round), str(r.session))
+        for r in manifest.itertuples()
+        if store.session_is_complete(SessionKey(int(r.year), int(r.round), str(r.session)))
+    }
     missing = [
         (r.year, r.round, r.session) not in have
         for r in expected.itertuples()

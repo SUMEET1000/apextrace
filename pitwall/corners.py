@@ -158,16 +158,21 @@ def build_segments(
     return seg
 
 
-def _segment_slice(lap: pd.DataFrame, start_m: float, end_m: float) -> pd.DataFrame:
-    d = lap["Distance"].to_numpy()
-    mask = (d >= start_m) & (d <= end_m)
+def _segment_slice(lap: pd.DataFrame, axis: np.ndarray,
+                   start: float, end: float) -> np.ndarray:
+    """Index mask for the samples of ``lap`` inside ``[start, end]`` on ``axis``.
+
+    ``axis`` is whichever coordinate the segment bounds are expressed in, so
+    the window and the samples are always read on the same one.
+    """
+    mask = (axis >= start) & (axis <= end)
     if not mask.any():
         # Degenerate window narrower than the grid spacing - take the nearest
         # single sample so downstream code still gets a row.
-        idx = int(np.abs(d - (start_m + end_m) / 2).argmin())
-        mask = np.zeros(len(d), dtype=bool)
+        idx = int(np.abs(axis - (start + end) / 2).argmin())
+        mask = np.zeros(len(axis), dtype=bool)
         mask[idx] = True
-    return lap[mask]
+    return mask
 
 
 def corner_metrics(lap: pd.DataFrame, segments: pd.DataFrame) -> pd.DataFrame:
@@ -207,14 +212,29 @@ def corner_metrics(lap: pd.DataFrame, segments: pd.DataFrame) -> pd.DataFrame:
     lap_t = lap["t"].to_numpy(dtype="float64")
     lap_v = lap["Speed"].to_numpy(dtype="float64")
 
+    # Reported positions go on the reference axis, not each lap's own metres,
+    # so two drivers' apexes and braking points are the same coordinate.
+    ref_length = (float(segments["ref_length_m"].iloc[0])
+                  if "ref_length_m" in segments.columns and len(segments)
+                  else None)
+    if has_rel and ref_length:
+        position = axis * ref_length
+    else:
+        position = lap["Distance"].to_numpy(dtype="float64")
+
     rows = []
     for seg in segments.itertuples():
-        s = _segment_slice(lap, seg.start_m, seg.end_m)
-        speed = s["Speed"].to_numpy(dtype="float64")
-        dist = s["Distance"].to_numpy(dtype="float64")
-
+        # One axis for the window and the boundaries alike. Slicing on this
+        # lap's own metres while interpolating on relative distance put the
+        # two up to 81 m apart on a lap 1.5% off the reference length - inside
+        # the ingestion tolerance, and wide enough to miss the apex.
         edges = ([seg.start_rel, seg.end_rel] if has_rel
                  else [seg.start_m, seg.end_m])
+        mask = _segment_slice(lap, axis, edges[0], edges[1])
+        speed = lap_v[mask]
+        dist = position[mask]
+        s = lap[mask]
+
         t_start, t_end = np.interp(edges, axis, lap_t)
         v_start, v_end = np.interp(edges, axis, lap_v)
 
