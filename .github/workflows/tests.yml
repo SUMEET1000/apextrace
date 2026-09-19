@@ -1,0 +1,25 @@
+name: tests
+
+on: push
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The suite runs on fixtures and skips the cases that need the real
+          # dataset, so the ~356 MB of parquet under data/ is dead weight here.
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/data
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - run: pytest tests/ -q
