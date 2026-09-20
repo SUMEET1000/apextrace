@@ -40,7 +40,7 @@ from pitwall.viz import theme  # noqa: E402
 app = FastAPI(
     title="ApexTrace API",
     description="F1 telemetry, corner analysis, and race strategy",
-    version="2.0.0",
+    version="2.0.1",
 )
 
 # The Vite dev server proxies /api, so same-origin in development and in the
