@@ -27,7 +27,11 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html, body, #root { height: 100%; }
+html, body { height: 100%; }
+/* #root is min-height, not height: the disclaimer footer in index.html is its
+   sibling, and a fixed one-viewport #root starts that footer one screen down and
+   over the top of anything that overflows. */
+#root { min-height: 100%; }
 
 body {
   margin: 0;

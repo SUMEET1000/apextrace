@@ -46,7 +46,7 @@ export function App() {
     setSlot(element);
   }, []);
 
-  if (manifest.loading) {
+  if (manifest.loading || opener.loading) {
     return <div className="pw-boot">Loading the session manifest…</div>;
   }
 

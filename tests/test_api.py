@@ -356,3 +356,10 @@ def test_the_spa_route_cannot_read_a_file_outside_the_build(attack):
     assert "root:" not in body, "served /etc/passwd"
     assert "fastapi" not in body.lower(), "served requirements.txt"
     assert "<html" in body.lower() or "<!doctype" in body.lower(), "not the SPA shell"
+
+
+def test_the_telemetry_cache_holds_two_frames_not_four():
+    """~74 MB per decoded frame against Render's 512 MB. See DECISIONS.md ADR-001."""
+    from api.cache import load_telemetry
+
+    assert load_telemetry.cache_info().maxsize == 2

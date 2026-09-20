@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: apextrace
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/manifest
+    autoDeploy: true
