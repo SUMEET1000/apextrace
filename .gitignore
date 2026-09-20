@@ -33,3 +33,6 @@ backfill.log
 # Agent tool scratch directories
 .agents/
 .codex/
+
+# playwright-cli writes page snapshots here on every run
+.playwright-cli/
