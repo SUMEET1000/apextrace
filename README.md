@@ -1,5 +1,8 @@
 # ApexTrace — F1 Telemetry Analysis
 
+**Live: [apextrace.onrender.com](https://apextrace.onrender.com)** — it opens on Silverstone 2024,
+Russell vs Verstappen. Free hosting, so it sleeps when idle; the first request wakes it.
+
 An analysis tool for Formula 1 timing and telemetry data. It compares drivers
 corner by corner, measures tyre degradation with confidence intervals, and
 separates track evolution from the tyre and fuel effects it is normally
