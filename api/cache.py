@@ -44,10 +44,14 @@ def load_artefact(slug: str, name: str) -> pd.DataFrame:
 # holds ~74 MB decoded, so an unbounded cache grows by that much for every
 # session anyone browses to and never gives it back.
 #
-# Two, not four. Render's free tier is a 512 MB box that also holds Python,
-# pandas and FastAPI; four decoded frames is ~296 MB of it. See DECISIONS.md
-# ADR-001. tests/test_api.py pins the bound so it cannot drift back.
-@lru_cache(maxsize=2)
+# One, not two or four. Render's free tier is a 512 MB box, and the cost of a
+# race session is not the frame: 2024/01_R decodes to 55 MB but grows the
+# container by 322 MB, because the parquet read takes arena memory from the OS
+# and does not give it back. The Dockerfile's three allocator variables are the
+# other half of this fix; neither half works alone. Measured 20 Sept 2026:
+# without them a cold container holding nothing is OOM-killed loading one race.
+# See DECISIONS.md ADR-001. tests/test_api.py pins the bound so it cannot drift.
+@lru_cache(maxsize=1)
 def load_telemetry(slug: str) -> pd.DataFrame:
     return store.read_telemetry(store.key_from_slug(slug))
 

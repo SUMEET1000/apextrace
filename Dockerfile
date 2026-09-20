@@ -22,6 +22,13 @@ COPY tests/ tests/
 COPY data/processed/ data/processed/
 COPY --from=web /app/frontend/dist frontend/dist
 ENV PYTHONUNBUFFERED=1
+# Reading one race parquet grows this container by 322 MB for a 55 MB frame:
+# glibc keeps a per-core arena and pyarrow's pool sits outside malloc, where a
+# trim cannot reach it. All three are needed and none works alone - measured
+# 20 Sept 2026, docker run -m 512m against the Gate 3c workload.
+ENV MALLOC_ARENA_MAX=2
+ENV MALLOC_TRIM_THRESHOLD_=131072
+ENV ARROW_DEFAULT_MEMORY_POOL=system
 EXPOSE 8000
 # One worker. The lru_cache loaders in api/cache.py are per-process and one
 # holds a ~74 MB decoded frame, so a second worker doubles memory for no extra

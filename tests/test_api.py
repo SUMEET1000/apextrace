@@ -358,8 +358,12 @@ def test_the_spa_route_cannot_read_a_file_outside_the_build(attack):
     assert "<html" in body.lower() or "<!doctype" in body.lower(), "not the SPA shell"
 
 
-def test_the_telemetry_cache_holds_two_frames_not_four():
-    """~74 MB per decoded frame against Render's 512 MB. See DECISIONS.md ADR-001."""
+def test_the_telemetry_cache_holds_one_frame():
+    """A race session costs the container 322 MB, not the frame's 55 MB.
+
+    Two frames plus a decode does not fit Render's 512 MB. See DECISIONS.md
+    ADR-001 and the Dockerfile's allocator variables, which are the other half.
+    """
     from api.cache import load_telemetry
 
-    assert load_telemetry.cache_info().maxsize == 2
+    assert load_telemetry.cache_info().maxsize == 1
