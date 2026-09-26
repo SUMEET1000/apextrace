@@ -195,6 +195,9 @@ def build() -> dict:
         "pit_loss": {"total_s": r(loss["pit_loss_s"], 3), "in_s": r(loss["in_lap_s"], 3),
                      "out_s": r(loss["out_lap_s"], 3), "stops": int(loss["n_stops"])},
         "spec": {"sessions": len(manifest["sessions"]), "seasons": len(manifest["years"]),
+                 "years": sorted(manifest["years"]),
+                 "latest_round": max(int(s["round"]) for s in manifest["sessions"]
+                                     if int(s["year"]) == max(manifest["years"])),
                  "tests": test_count(), "data_mib": data_mib()},
         "compound_colours": theme["compound_colours"],
         "session_labels": theme["session_labels"],

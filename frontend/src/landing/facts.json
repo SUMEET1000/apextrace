@@ -333,6 +333,12 @@
  "spec": {
   "sessions": 295,
   "seasons": 3,
+  "years": [
+   2024,
+   2025,
+   2026
+  ],
+  "latest_round": 11,
   "tests": 222,
   "data_mib": 625
  },

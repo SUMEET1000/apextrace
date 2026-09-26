@@ -128,7 +128,7 @@ export function Landing() {
         <p style={{ maxWidth: '60ch', marginTop: 14 }}><Term id="stint" /> <Term id="pit-loss" /> <Term id="undercut" /></p>
         <div className="stack">
           <Link className="sc acc" data-q="corners" to={LINKS.corners}>
-            <div className="l"><span className="lab">QUESTION 1 · CORNERS ↗</span><h3>Four tenths quicker. Where?</h3></div>
+            <div className="l"><span className="lab">QUESTION 1 · CORNERS ↗</span><h3>{s1(F.lap.gap_s)} seconds quicker. Where?</h3></div>
             <div className="r"><div className="v">{IN_CORNERS} S</div><p>of {A}'s {GAP} s came from corners. For each corner: where he braked, his slowest speed through it, and when he got back on the throttle.</p></div>
           </Link>
           <Link className="sc" data-q="tyres" to={LINKS.tyres} style={{ background: 'var(--paper)' }}>
@@ -161,7 +161,7 @@ export function Landing() {
         <p style={{ maxWidth: '60ch', marginTop: 14 }}><Term id="telemetry" /></p>
         <div className="spec" data-reveal>
           <div className="sp"><b>{F.spec.sessions}</b><span>Sessions</span><p>F1 practice, qualifying, sprint and race sessions, each with lap times and car telemetry.</p></div>
-          <div className="sp"><b>{F.spec.seasons}</b><span>Seasons</span><p>2024 and 2025 in full, and 2026 up to round 11.</p></div>
+          <div className="sp"><b>{F.spec.seasons}</b><span>Seasons</span><p>{F.spec.years.join(', ')}. Latest stored season through round {F.spec.latest_round}.</p></div>
           <div className="sp"><b>{F.spec.tests}</b><span>Tests</span><p>Automated checks on the analysis and the API. They run on every code change.</p></div>
           <div className="sp"><b>{F.spec.data_mib}</b><span>MiB of data</span><p>Cleaned F1 timing data from the FastF1 library, stored as Parquet files.</p></div>
         </div>
@@ -171,7 +171,7 @@ export function Landing() {
         <span className="lab">WHO BUILT IT</span><span className="lab">ANALYSIS, CODE, DESIGN</span><div className="k" data-reveal>Sumeet</div><span className="lab">FINAL-YEAR COMPUTER SCIENCE STUDENT · DATA PIPELINE, ANALYSIS, API AND THIS SITE</span>
         <nav><a href="https://github.com/SUMEET1000" target="_blank" rel="noopener">GitHub ↗</a><a href="#">LinkedIn ↗</a><a href="#">Case study ↗</a></nav>
         <Link className="btn" to={LINKS.corners}><span>Open the analysis</span><span>↗</span></Link>
-        <span className="lab">DATA: FASTF1, WHICH READS THE OFFICIAL F1 TIMING FEED · 2024–2026</span>
+        <span className="lab">DATA: FASTF1, WHICH READS THE OFFICIAL F1 TIMING FEED · {F.spec.years[0]}–{F.spec.years[F.spec.years.length - 1]}</span>
       </section>
 
       <section id="sig" className="sheet sig" aria-label="End of sheet" style={{ '--sig-h': '55vh', '--sig-d': '19px' } as CSSProperties}>
