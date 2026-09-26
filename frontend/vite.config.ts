@@ -13,6 +13,14 @@ export default defineConfig({
       '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
+  // `vite preview` serves the built dist/ with the same /api proxy, which is
+  // the static-site topology the browser gates in scripts/ui run against.
+  preview: {
+    port: 4173,
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+    },
+  },
   build: {
     // plotly.js is ~4.8 MB unminified and dwarfs everything else. Splitting it
     // out keeps the app chunk small enough to re-download on every deploy

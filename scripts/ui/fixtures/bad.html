@@ -1,0 +1,26 @@
+<!doctype html>
+<!-- gate.py must fail this page, naming all eight seeded faults.
+     Open it as bad.html?year=2024&round=12&session=Q so the slug check has a URL to compare. -->
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gate fixture</title>
+<style>body{margin:0;font:16px/1.5 sans-serif;background:#fff;color:#111}</style></head>
+<body data-slug="2024/01_R">
+<!-- 1. sideways overflow -->
+<div style="width:3000px;height:10px;background:#111"></div>
+<!-- 2. contrast: #bbb on white is about 1.9:1 -->
+<p style="color:#bbb">This sentence is too pale to read.</p>
+<!-- 5. a glossary term with no explanation on the page -->
+<p>Each stint ends at a pit stop.</p>
+<!-- 4. a chart with no finding sentence above it -->
+<figure><svg data-chart="bare" viewBox="0 0 100 50" width="200" height="100"><rect x="10" y="10" width="30" height="30"/></svg></figure>
+<!-- 8. JavaScript motion that ignores reduced motion -->
+<div id="mover" style="width:20px;height:20px;background:#111"></div>
+<!-- 6. an empty tail far longer than one viewport -->
+<div style="height:3000px"></div>
+<script>
+  console.error('seeded console error');   // 3. a console error
+  const m = document.getElementById('mover');
+  (function f(t) { m.style.transform = 'translateX(' + (t / 20 % 200) + 'px)'; requestAnimationFrame(f); })(0);
+</script>
+<!-- 7. data-slug on <body> names 2024/01_R while the URL names 2024/12_Q -->
+</body></html>
