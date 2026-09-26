@@ -7,3 +7,19 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /api/manifest
     autoDeploy: true
+  # The front end, served from Render's CDN so it answers at once while the
+  # free web service above spends ~46 s waking. /api is passed through to that
+  # service, so the client calls the same relative /api everywhere. Rewrites
+  # never apply where a built file exists, so assets are served as files.
+  - type: web
+    name: apextrace-site
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://apextrace.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
