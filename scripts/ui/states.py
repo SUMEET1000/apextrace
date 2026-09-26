@@ -73,6 +73,13 @@ def open_page(browser, base: str, route: str, width: int, setup):
     return ctx, page, errors
 
 
+def done(page, ctx) -> None:
+    # A request still in a route handler when the context closes raises in
+    # Playwright's event loop; drop the handlers first.
+    page.unroute_all(behavior="ignoreErrors")
+    ctx.close()
+
+
 def expect_alert(gate: Gate, page, label: str, wanted: str) -> None:
     why = settled(page)
     alert = text_of(page, "[role=alert]")
@@ -114,43 +121,47 @@ def run(gate: Gate, browser, base: str, name: str, route: str, width: int) -> No
     alert = text_of(page, "[role=alert]")
     gate.check(not why and not alert and not errors, f"{tag} held: settles once the API answers",
                why or alert or errors[:2])
-    ctx.close()
+    done(page, ctx)
 
     # empty manifest
     ctx, page, _ = open_page(browser, base, route, width,
                              lambda p: p.route("**/api/manifest*", fulfil_json(200, {"sessions": [], "years": [], "featured": []})))
     why = settled(page)
-    gate.check(not why and "nothing to show" in page.inner_text("main").lower(), f"{tag} empty manifest", why or page.inner_text("main")[:120])
-    ctx.close()
+    gate.check(not why and "nothing to show" in text_of(page, "main").lower(), f"{tag} empty manifest", why or text_of(page, "main")[:120])
+    done(page, ctx)
 
     # empty session
     ctx, page, _ = open_page(browser, base, route, width, lambda p: p.route("**/api/session?*", empty_session))
     why = settled(page)
-    gate.check(not why and "nothing to show" in page.inner_text("main").lower(), f"{tag} empty session", why or page.inner_text("main")[:120])
-    ctx.close()
+    gate.check(not why and "nothing to show" in text_of(page, "main").lower(), f"{tag} empty session", why or text_of(page, "main")[:120])
+    done(page, ctx)
 
     # 500, plain text, then Retry
     ctx, page, _ = open_page(browser, base, route, width,
                              lambda p: p.route("**/api/manifest*", lambda r: r.fulfill(status=500, body="Internal Server Error")))
     expect_alert(gate, page, f"{tag} 500 on manifest", "500")
     page.unroute("**/api/manifest*")
-    page.get_by_role("button", name=re.compile("retry", re.I)).first.click()
-    why = settled(page)
+    button = page.get_by_role("button", name=re.compile("retry", re.I))
+    if button.count():
+        button.first.click()
+        why = settled(page)
+    else:
+        why = "no Retry button to press"
     gate.check(not why and not text_of(page, "[role=alert]") and page.locator(".pw-main").count() == 1,
                f"{tag} Retry recovers", why or text_of(page, "[role=alert]"))
-    ctx.close()
+    done(page, ctx)
 
     # 404 with the API's detail
     ctx, page, _ = open_page(browser, base, route, width,
                              lambda p: p.route("**/api/session?*", fulfil_json(404, {"detail": NOT_IN_MANIFEST.format(SLUGS[name])})))
     expect_alert(gate, page, f"{tag} 404 on session", NOT_IN_MANIFEST.format(SLUGS[name]))
-    ctx.close()
+    done(page, ctx)
 
     endpoint, status, detail = (("**/api/corner-analysis?*", 409, CORNER_409) if name == "corner"
                                 else ("**/api/race-arc?*", 404, NO_LAP_DATA))
     ctx, page, _ = open_page(browser, base, route, width, lambda p: p.route(endpoint, fulfil_json(status, {"detail": detail})))
     expect_alert(gate, page, f"{tag} {status} on {endpoint.split('/')[-1].rstrip('?*')}", detail)
-    ctx.close()
+    done(page, ctx)
 
 
 def main() -> None:
