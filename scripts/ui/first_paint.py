@@ -1,17 +1,16 @@
-"""First paint: the landing's answer never waits on the API, and the loader
-stays only while the page really loads.
+"""First paint: a fixed 2.6 s loader hold, independent of API and cache state.
 
 Pending part, every /api/* request held for the whole run:
-  (a) the loader is removed by 2.8 s;
+  (a) the loader starts its 0.9 s exit after the 2.6 s hold;
   (b) once it is gone, the answer sentence and its 0.384 and 0.326 figures are
       on top - elementFromPoint at each one's centre lands inside the answer;
-  (c) with the hero image also held, the loader is still down at 2.4 s and
-      lifts at the 2.6 s cap.
+  (c) holding the hero image does not extend that sequence.
 Cache part, no routing at all (Playwright's route turns the HTTP cache off):
   two visits in one context; on the second, the hero image and the font files
   come from the browser cache - no body transferred: transferSize is 0, or a
   header-only 304 below the body size where the server says revalidate - and
-  the loader is removed within 1.0 s. Measured 26 Sept 2026: vite preview
+  the loader still holds for 2.6 s (Sumeet's override, 26 Sept 2026).
+  Measured 26 Sept 2026: vite preview
   sends no-cache and the live static site max-age=0 for every file, so the
   hero image is always revalidated there.
 
@@ -72,20 +71,14 @@ def pending(gate: Gate, browser, base: str, width: int, hold_image: bool) -> Non
     errors = watch_errors(page)
     page.goto(base.rstrip("/") + "/", wait_until="domcontentloaded")
     tag = f"{width}{' image held' if hold_image else ''}"
-    if hold_image:
-        page.wait_for_function("performance.now()>2400")
-        early = times(page).get("lift")
-        page.wait_for_timeout(600)
-        lift = times(page).get("lift")
-        gate.check(early is None and lift is not None and 2550 <= lift <= 2800, f"{tag} (c) loader stays until the 2.6 s cap",
-                   f"lift at {lift and round(lift)} ms, lifted before 2.4 s: {early is not None}")
-        gone = times(page).get("gone")
-        gate.check(gone is not None and gone <= 2800, f"{tag} (c) loader removed by 2.8 s even with the image held",
-                   f"removed at {gone and round(gone)} ms")
-    else:
-        page.wait_for_timeout(3000)
-        gone = times(page).get("gone")
-        gate.check(gone is not None and gone <= 2800, f"{tag} (a) loader gone by 2.8 s", f"removed at {gone and round(gone)} ms")
+    page.wait_for_function("performance.now()>2400")
+    early = times(page).get("lift")
+    page.wait_for_function("performance.now()>3700")
+    lift, gone = times(page).get("lift"), times(page).get("gone")
+    gate.check(early is None and lift is not None and 2550 <= lift <= 2800,
+               f"{tag} loader holds for 2.6 s", f"lift at {lift and round(lift)} ms")
+    gate.check(gone is not None and lift is not None and 850 <= gone - lift <= 1100,
+               f"{tag} original 0.9 s exit completes", f"removed at {gone and round(gone)} ms")
     f = facts()["lap"]
     wanted = [f"{f['gap_s']:.3f}", f"{f['corner_s']:.3f}"]
     top = page.evaluate(ON_TOP, wanted)
@@ -109,14 +102,15 @@ def cached(gate: Gate, browser, base: str, width: int) -> None:
     gate.check(bool(first) and all(fresh(e) for e in first), f"{width} cache: first visit downloads the hero image", first)
     page.goto(url, wait_until="load")
     page.wait_for_function("window.__lf&&window.__lf.gone", timeout=10_000)
-    gone = times(page)["gone"]
+    lift, gone = times(page)["lift"], times(page)["gone"]
     entries = page.evaluate(ENTRIES)
     image = [e for e in entries if e[0].startswith("sensor")]
     fonts = [e for e in entries if not e[0].startswith("sensor")]
     downloaded = [e for e in entries if fresh(e)]
     gate.check(bool(image) and bool(fonts) and not downloaded, f"{width} cache: hero image and fonts from cache on the second visit",
                f"image {image}, fonts {fonts}")
-    gate.check(gone <= 1000, f"{width} cache: loader removed within 1.0 s", f"removed at {round(gone)} ms")
+    gate.check(2550 <= lift <= 2800 and 850 <= gone - lift <= 1100,
+               f"{width} cache: same 2.6 s hold and 0.9 s exit", f"lift {round(lift)}, removed {round(gone)} ms")
     ctx.close()
 
 

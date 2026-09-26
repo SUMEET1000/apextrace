@@ -141,7 +141,7 @@ body{font-size:16px}.lab{font-size:13px}header nav{gap:26px}.btn{font-size:14px}
 /* In index.html, so it covers the page before the script runs (sheet.css). If
  * the script never runs, it lifts by itself after 6 s. */
 #loader { position: fixed; inset: 0; z-index: 100; background: var(--acc); display: grid; place-items: center;
-  transition: transform .15s cubic-bezier(.8,0,.2,1); animation: loader-fallback .9s cubic-bezier(.8,0,.2,1) 6s forwards; }
+  transition: transform .9s cubic-bezier(.8,0,.2,1); animation: loader-fallback .9s cubic-bezier(.8,0,.2,1) 6s forwards; }
 #loader.done { transform: translateY(-100%); }
 #loader .k { font-size: clamp(60px,12vw,200px); text-align: center; }
 #loader .bar { width: 60vw; height: 18px; border: var(--bw) solid var(--ink); margin: 24px auto 10px; }
