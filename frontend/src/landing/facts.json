@@ -190,7 +190,8 @@
   {
    "label": "straights",
    "value": 0.05807,
-   "turns": []
+   "turns": [],
+   "count": 3
   }
  ],
  "track": {

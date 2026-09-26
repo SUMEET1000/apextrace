@@ -1,0 +1,151 @@
+/* The landing, landings/08-finished.html ported: 08's own <style> block and the
+ * sheet.css rules it uses, nested under .landing so none of it reaches the app
+ * routes. Rules in it that name header, body or :root match nothing here;
+ * global.css carries those. The loader and the grab cursor live outside
+ * .landing and are at the end. Only the "pole" wording and the numbers moved
+ * (into facts.json); the look is 08's. */
+
+.landing {
+section{position:relative;padding:14vh 4vw}.sheet{border-top:var(--bw) solid var(--ink)}
+/* D's 18-corner grid, kept on every iteration by his instruction (23 Sept 2026). */
+.index{display:grid;grid-template-columns:repeat(6,1fr);border-top:var(--bw) solid var(--ink);border-left:var(--bw) solid var(--ink)}.index div{border-right:var(--bw) solid var(--ink);border-bottom:var(--bw) solid var(--ink);padding:12px;min-height:140px;display:flex;flex-direction:column;justify-content:space-between;background:var(--paper);transition:background .25s}
+.index div:hover{background:#fff}.index b{font:400 40px/1 var(--fd)}.index .hot,.index .hot:hover{background:var(--acc)}.index em{font:400 24px/1 var(--fd);font-style:normal}
+@media(max-width:860px){.index{grid-template-columns:repeat(3,1fr)}}
+
+/* Hero: 05E Monaco x Green Hell. Title panel left, circuit and ghost lap only in the right
+   column, both under the photo band, so the two never share pixels. */
+.hero{height:100vh;min-height:760px;padding:0;overflow:hidden}
+.hero .photo{position:absolute;left:0;right:0;top:56px;height:26vh;background:var(--paper);border-bottom:var(--bw) solid var(--ink);overflow:hidden}.hero .photo canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hero .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 40%,var(--acc));mix-blend-mode:multiply;opacity:.8}
+.cross{position:absolute;inset:0;pointer-events:none}.cross i{position:absolute;border:0 dashed #13131366}.cross .h{left:0;right:0;border-top-width:1px}.cross .v{top:0;bottom:0;border-left-width:1px}
+.panel{position:absolute;left:2vw;top:calc(56px + 16vh);width:36vw;z-index:4;border:var(--bw) solid var(--ink)}.panel .top{display:flex;justify-content:space-between;align-items:center;padding:10px 12px}
+.panel h1{font-size:clamp(40px,4.9vw,92px);padding:4px 12px 12px;white-space:nowrap}.panel .foot{padding:14px 12px 16px;border-top:var(--bw) solid var(--ink);background:var(--paper)}
+.strip{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #13131366}.strip span{padding:8px 12px}
+.stage{position:absolute;left:40vw;right:2vw;top:calc(56px + 26vh + 3vh);bottom:4vh}.stage svg{width:100%;height:100%;overflow:visible}
+.ann{position:absolute;z-index:3}.ann b{display:block;font:700 13px var(--fm)}
+/* Answer: 06D pinned counter */
+.count{height:100vh;display:grid;grid-template-columns:1.2fr 1fr;gap:4vw;align-items:center;padding:0 4vw}
+.count .big{font:400 clamp(110px,15vw,280px)/.85 var(--fd);white-space:nowrap}.count .big small{font-size:.3em}
+.count ol{list-style:none;padding:0;border-top:var(--bw) solid var(--ink)}.count li{display:flex;justify-content:space-between;gap:20px;padding:14px 10px;border-bottom:var(--bw) solid var(--ink);font:400 clamp(20px,2vw,32px) var(--fd);text-transform:uppercase;opacity:.18;transition:opacity .3s,background .3s}
+.count li small{display:block;font:500 13px var(--fm);letter-spacing:.04em}.count li.on{opacity:1}.count li.now{background:var(--acc)}
+.legend{display:flex;gap:24px;align-items:center;margin-top:4vh}.legend i{display:inline-block;width:18px;height:18px;border:var(--bw) solid var(--ink);vertical-align:middle;margin-right:8px}
+/* Questions: 06B stacking cards */
+.stack{margin-top:8vh}.sc{position:sticky;top:80px;display:grid;grid-template-columns:1fr 1fr;min-height:62vh;border:var(--bw) solid var(--ink);margin-bottom:6vh;box-shadow:0 -12px 0 var(--paper)}
+.sc .l{padding:30px;display:flex;flex-direction:column;justify-content:space-between}.sc .r{border-left:var(--bw) solid var(--ink);padding:30px;display:flex;flex-direction:column;justify-content:flex-end;background:var(--paper)}
+.sc h3{font:400 clamp(40px,4.6vw,84px)/.9 var(--fd);text-transform:uppercase}.sc .v{font:400 clamp(60px,7vw,130px)/.9 var(--fd)}
+/* Method: 06C timeline, carrying the formula boxes */
+.tl{position:relative;margin-top:8vh;padding-left:90px}.tl::before{content:"";position:absolute;left:30px;top:0;bottom:0;width:3px;background:var(--ink)}
+.tl .st{position:relative;padding:0 0 12vh}.tl .st:last-child{padding-bottom:0}.tl .st::before{content:attr(data-n);position:absolute;left:-84px;top:0;width:50px;height:50px;border:var(--bw) solid var(--ink);background:var(--acc);display:grid;place-items:center;font:400 22px var(--fd)}
+.tl h3{font:400 clamp(40px,5vw,90px)/.9 var(--fd);text-transform:uppercase;margin-bottom:14px}.tl p{max-width:56ch;font-size:16px}
+.eq{font:500 20px/1.5 var(--fm);background:#fff;border:1px solid var(--ink);padding:14px;margin:16px 0;width:max-content;max-width:100%}
+/* Data: 06A proof line */
+.proofline{font:400 clamp(60px,9vw,170px)/.95 var(--fd);text-transform:uppercase}.proofline span{color:var(--paper);-webkit-text-stroke:3px var(--ink)}.proofline b{font-weight:400;background:var(--acc);padding:0 .1em}
+/* Credits: 06A */
+.credits{text-align:center;padding:16vh 4vw}.credits .lab{display:block;margin:26px 0 6px}.credits .k{font-size:clamp(60px,9vw,160px)}.credits nav{display:flex;justify-content:center;gap:4vw;margin:6vh 0;font:400 28px var(--fd);text-transform:uppercase}.credits nav a:hover{background:var(--acc)}
+@media(max-width:860px){.ann{display:none}.hero{height:auto;min-height:0;padding:calc(56px + 26vh + 3vh) 4vw 4vh}.panel,.stage{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:auto}.stage{height:44vh;margin-top:4vh}.tl h3{font-size:26px}.eq{font-size:15px}.count{grid-template-columns:1fr;height:auto;padding:12vh 4vw}.sc{grid-template-columns:1fr}.sc .r{border-left:0;border-top:var(--bw) solid var(--ink)}.tl{padding-left:70px}.tl .st::before{left:-66px}.credits nav{flex-direction:column}}
+/* tweaks.json (saved 23 Sept 2026), baked: grain, button hover and press. The ink is 05E's
+   yellow since 24 Sept 2026. */
+:root{--acc:#F2E600;--grain:.45}
+.btn{transition:transform .18s,box-shadow .18s,background-color .18s,color .18s}
+.btn:hover{background:var(--acc)!important;color:#131313!important;outline:var(--bw) solid var(--ink)}
+.btn:active{background:var(--acc)!important;color:#131313!important;outline:var(--bw) solid var(--ink);transform:scale(.95)!important}
+/* End-of-sheet print */
+.sig-strip{display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:1px solid #1313135c;padding-bottom:10px}
+.sig-stage{position:relative;height:var(--sig-h);margin:4vh 0}.sig-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.sig .reg{position:absolute;width:26px;height:26px;border:2px solid var(--ink);border-radius:50%}.sig .reg::before,.sig .reg::after{content:"";position:absolute;background:var(--ink)}.sig .reg::before{left:10px;top:-8px;width:2px;height:38px}.sig .reg::after{top:10px;left:-8px;height:2px;width:38px}
+.sig-col{display:flex;justify-content:space-between;align-items:end;gap:24px;flex-wrap:wrap;border-top:var(--bw) solid var(--ink);padding-top:14px}
+.sig-name{font-size:clamp(40px,6vw,110px)}.sig-facts{display:flex;flex-wrap:wrap;gap:8px 22px;max-width:60ch}
+.sig-chq{position:relative;height:calc(var(--sig-d) * 2);margin:5vh -4vw 0;background:conic-gradient(var(--ink) 25%,var(--paper) 0 50%,var(--ink) 0 75%,var(--paper) 0) 0 0/calc(var(--sig-d) * 2) calc(var(--sig-d) * 2)}
+.sig-chq::after{content:"";position:absolute;inset:0;background:radial-gradient(var(--acc) 30%,transparent 34%) 0 0/calc(var(--sig-d) / 2.5) calc(var(--sig-d) / 2.5);mix-blend-mode:multiply}
+
+.hdr-r{display:flex;gap:14px;align-items:center}
+.eng{white-space:nowrap}@media(max-width:480px){header{padding:0 12px}header .k{font-size:17px}.hdr-r{gap:8px}.hdr-r .lab{font-size:10px}}
+@media(prefers-reduced-motion:reduce){.btn,.index div,.count li,.credits nav a{transition:none!important}}
+/* Finishing changes, 24 Sept 2026: lighter grid rules, a gap in the wordmark. */
+.index{--bw:2px}
+.wg{margin-left:.22em}
+/* Component: rolling digits (21st.dev "Rolling Digits" / "Number Flow"). The counter's digits
+   roll like an odometer. #sum stays the source of truth and is kept for screen readers. */
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.roll{display:inline-flex}.roll .c{display:inline-block;height:1em;line-height:1em;overflow:hidden;vertical-align:bottom}
+.roll .s{display:flex;flex-direction:column;transition:transform .7s cubic-bezier(.2,.9,.2,1)}.roll .s b{font-weight:inherit;height:1em;line-height:1em;text-align:center}
+@media(prefers-reduced-motion:reduce){.roll .s{transition:none}}
+/* Component: magnetic button + expanding arrow (21st.dev "Magnetic Button", "Expanding Arrow
+   Button") and a wipe-in underline for links ("Text Underline"). */
+.btn{transition:transform .18s,box-shadow .18s,background-color .18s,color .18s,translate .35s cubic-bezier(.2,.8,.2,1)}
+.btn>span:last-child{display:inline-block;transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+.btn:hover>span:last-child{transform:translate(5px,-5px) scale(1.4)}
+header nav a,.credits nav a{background:linear-gradient(var(--acc),var(--acc)) 0 100%/0 40% no-repeat;transition:background-size .35s cubic-bezier(.2,.8,.2,1),translate .35s cubic-bezier(.2,.8,.2,1)}
+header nav a:hover,.credits nav a:hover{background:linear-gradient(var(--acc),var(--acc)) 0 100%/100% 40% no-repeat}
+@media(prefers-reduced-motion:reduce){.btn>span:last-child,header nav a,.credits nav a{transition:none}}
+/* Component: scroll progress (21st.dev "Scroll Progress"), drawn as a lap bar under the header
+   with a tick per section. Hovering it opens it up and names the sections. */
+.prog{position:fixed;left:0;right:0;height:5px;z-index:55;background:#1313131f;transition:height .25s}
+.prog i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--acc);box-shadow:2px 0 0 var(--ink)}
+.prog u{position:absolute;top:0;bottom:0;width:2px;background:var(--ink);text-decoration:none}
+.prog u b{position:absolute;top:100%;left:4px;margin-top:4px;font:500 10px var(--fm);letter-spacing:.04em;white-space:nowrap;opacity:0;transition:opacity .2s;background:var(--paper);padding:1px 4px}
+.prog:hover{height:12px}.prog:hover u b{opacity:1}
+/* Specification numbers roll up from 0 when the line comes into view: the units column spins
+   two full turns, the tens one, the hundreds none, so it reads as counting up. */
+/* Specification: four labelled stats, each with one plain sentence, so a visitor knows what every
+   number counts. The yellow is a marker stripe layered behind the lower half of each number. */
+.spec{display:grid;grid-template-columns:repeat(4,1fr);border-top:var(--bw) solid var(--ink);border-bottom:var(--bw) solid var(--ink);margin-top:4vh}
+.sp{padding:28px 24px 32px;border-right:var(--bw) solid var(--ink)}.sp:last-child{border-right:0}
+.sp b{position:relative;display:inline-block;font:400 clamp(64px,7vw,128px)/1 var(--fd);isolation:isolate}
+.sp b::before{content:"";position:absolute;left:-.06em;right:-.06em;bottom:.04em;height:.42em;background:var(--acc);z-index:-1}
+.sp>span{display:block;font:400 clamp(22px,2vw,34px)/1 var(--fd);text-transform:uppercase;margin-top:14px}
+.sp p{font-size:14px;line-height:1.5;max-width:30ch;margin-top:10px}
+.spec .roll .s{transition:none}
+@media(max-width:860px){.spec{grid-template-columns:1fr 1fr}.sp:nth-child(2){border-right:0}.sp:nth-child(-n+2){border-bottom:var(--bw) solid var(--ink)}.sp{padding:20px 16px 24px}}
+.roll .s i{font-style:normal;display:block;height:1em;line-height:1em;text-align:center}
+/* Corner grid: Verstappen's corners are solid ink with paper type, Russell's stay yellow, so
+   both drivers read as filled. */
+.index .ver,.index .ver:hover{background:var(--ink);color:var(--paper)}.legend i.ver{background:var(--ink)}
+/* Ask the data: each question card carries a small chart drawn only from numbers the card
+   states (corner deltas come from sheet.js DELTA). The track chart has no numbers behind it,
+   so it says so. Charts sit in a paper box so the yellow cards cannot swallow the yellow marks. */
+.sc .r.acc{background:var(--acc)}
+.qc{background:var(--paper);border:2px solid var(--ink);padding:12px 14px 10px;margin:18px 0;color:var(--ink)}
+.qc svg{width:100%;height:auto;display:block;overflow:visible}.qc .cap{font:500 13px var(--fm);letter-spacing:.04em;margin-top:8px;min-height:1.3em}
+.qc text{font:500 12px var(--fm);fill:var(--ink);letter-spacing:.03em}.qc text.b{font-weight:700}
+.qc .ax{stroke:var(--ink);stroke-width:1.5}.qc .ru{fill:var(--acc);stroke:var(--ink);stroke-width:1.5}.qc .ve{fill:var(--ink)}.qc .ev{fill:var(--ink);opacity:.4}
+.qc [data-t]{transition:opacity .2s}.qc svg:hover [data-t]{opacity:.3}.qc svg [data-t]:hover{opacity:1}
+.qc .band{fill:var(--acc);stroke:var(--ink);stroke-width:1}.qc .soft{stroke:var(--ink);stroke-width:3}.qc .hard{stroke:var(--ink);stroke-width:2;stroke-dasharray:6 5}
+.qc .ln{fill:none;stroke:var(--ink);stroke-width:3}.qc .ln.y{stroke:var(--acc)}.qc .ln.d{stroke-dasharray:7 5}.qc .hit{fill:none;stroke:transparent;stroke-width:16}
+.qc .in{fill:var(--ink)}.qc .out{fill:var(--acc);stroke:var(--ink);stroke-width:2}
+@media(prefers-reduced-motion:reduce){.qc [data-t]{transition:none}}
+/* Readability pass, 26 Sept 2026: body 16 px, labels 13 px, no meaning-carrying text under 12 px.
+   Kept here rather than in sheet.css, which older page versions still load. */
+body{font-size:16px}.lab{font-size:13px}header nav{gap:26px}.btn{font-size:14px}
+.sp p{font-size:16px}.prog u b{font-size:12px}
+.panel .foot p{font-size:16px;line-height:1.5}.panel .foot strong{font:400 20px/1.15 var(--fd);text-transform:uppercase;display:block;margin-bottom:6px}
+.strip{display:flex;justify-content:space-between;gap:12px}.strip span{padding:8px 12px}
+/* Unlit gap rows stay readable (about 3:1 on paper) so the scroll reveal no longer hides the numbers. */
+.count li{opacity:.45}
+/* Phone: the section links move to a bar along the bottom edge instead of disappearing. */
+@media(max-width:860px){header nav{display:flex;position:fixed;left:0;right:0;bottom:0;height:52px;justify-content:space-around;align-items:center;gap:0;background:var(--paper);border-top:var(--bw) solid var(--ink);z-index:41}
+  header nav a{padding:14px 8px}body{padding-bottom:52px}}
+@media(max-width:480px){.hdr-r .lab{font-size:12px}}
+/* Chart text is in viewBox units: a phone draws the 400-wide chart near 300 px, so 16 units reads as about 12 px. */
+@media(max-width:860px){.qc text{font-size:16px}}
+/* Polish, 26 Sept 2026: browser surfaces in the page's ink, and 44 px touch targets on phones. */
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px}.btn:focus-visible{outline-color:var(--ink);outline-offset:4px}
+::selection{background:var(--acc);color:var(--ink)}html{scrollbar-color:var(--ink) var(--paper)}
+@media(max-width:860px){header>a.k{display:flex;align-items:center;min-height:44px}.credits nav a{min-height:44px;display:flex;align-items:center;justify-content:center}}
+/* Hero terrain: a hidden dot grid shown through morphing, wandering window shapes, in the
+   sheet.js dot size and ink. The pointer ripples the windows like water. */
+.stage .terr{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}.stage svg{position:relative}
+#car{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:35}@media(max-width:859.98px){#car{display:none}}
+}
+
+/* In index.html, so it covers the page before the script runs (sheet.css). If
+ * the script never runs, it lifts by itself after 6 s. */
+#loader { position: fixed; inset: 0; z-index: 100; background: var(--acc); display: grid; place-items: center;
+  transition: transform .15s cubic-bezier(.8,0,.2,1); animation: loader-fallback .9s cubic-bezier(.8,0,.2,1) 6s forwards; }
+#loader.done { transform: translateY(-100%); }
+#loader .k { font-size: clamp(60px,12vw,200px); text-align: center; }
+#loader .bar { width: 60vw; height: 18px; border: var(--bw) solid var(--ink); margin: 24px auto 10px; }
+#loader i { display: block; height: 100%; background: var(--ink); transform-origin: left; transform: scaleX(0); }
+@keyframes loader-fallback { to { transform: translateY(-100%); } }
+
+.car-grab,.car-grab *{cursor:grab!important}.car-grabbing,.car-grabbing *{cursor:grabbing!important;user-select:none!important}

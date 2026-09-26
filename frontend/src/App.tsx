@@ -13,7 +13,8 @@ import { SessionPicker, type Selection } from './components/SessionPicker';
 import { Empty, ErrorState, Loading } from './components/states';
 import { useReveal } from './hooks/useReveal';
 import { fetchManifest, fetchOpener, useAsync } from './lib/api';
-import { Link, useLocation } from './lib/router';
+import { Landing } from './landing/Landing';
+import { useLocation } from './lib/router';
 import { CornerAnalysisPage } from './pages/CornerAnalysis';
 import { RaceArcPage } from './pages/RaceArc';
 
@@ -28,21 +29,11 @@ export function App() {
   return (
     <>
       <Header />
-      <main className="shell-main">
-        {analysis ? <Analysis pathname={pathname} search={search} /> : <LandingPending />}
-      </main>
+      {analysis
+        ? <main className="shell-main"><Analysis pathname={pathname} search={search} /></main>
+        : <Landing />}
       <Footer />
     </>
-  );
-}
-
-/** Holds `/` until the landing is ported in Phase 2B Step 3. */
-function LandingPending() {
-  return (
-    <div className="shell-note">
-      <span className="lab">The front page is being rebuilt</span>
-      <Link to="/corner-analysis" className="btn"><span>Open the analysis</span><span>↗</span></Link>
-    </div>
   );
 }
 

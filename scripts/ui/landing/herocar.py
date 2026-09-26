@@ -21,6 +21,8 @@ from common import GL_ARGS, Gate, landing_url, parse, viewport, watch_errors  # 
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 OUT = Path(tempfile.gettempdir()) / "apextrace-herocar"
+ALONE = ("body *:not(#car){visibility:hidden!important}#car{visibility:visible!important}"
+         "body::before{display:none!important}html,body{background:#fff!important}")
 BAND = "(()=>{const r=document.querySelector('.hero .photo').getBoundingClientRect();return [r.bottom,r.height]})()"
 
 
@@ -48,6 +50,13 @@ def main() -> None:
             page.evaluate("document.getElementById('car').style.visibility='hidden'")
             hidden = rgb(page, box)
             page.evaluate("document.getElementById('car').style.visibility=''")
+            # The wheels: the car canvas alone on white. Over the band's dark halftone dots the
+            # shown-vs-hidden test above cannot see the tyres, and read the car 8 px high at
+            # 1366 on 08 itself, whose wheels are 2.7 px above the line (measured 26 Sept 2026).
+            alone = page.add_style_tag(content=ALONE)
+            page.wait_for_timeout(100)
+            solo = rgb(page, box)
+            alone.evaluate("e=>e.remove()")
             dark = shown.max(axis=2) < 110
             changed = np.abs(shown - hidden).sum(axis=2) > 60
             ys, xs = np.nonzero(dark & changed & (hidden.max(axis=2) >= 110))
@@ -56,7 +65,8 @@ def main() -> None:
             if not gate.check(len(xs) > 50, f"{case} car drawn near its hero spot", f"{len(xs)} car pixels"):
                 continue
             left, right = box["x"] + xs.min(), box["x"] + xs.max()
-            low = box["y"] + ys.max()
+            solo_ys = np.nonzero((solo.max(axis=2) < 200).any(axis=1))[0]
+            low = box["y"] + (solo_ys.max() if len(solo_ys) else ys.max())
             gate.check(0.75 * length <= right - left <= 1.15 * length, f"{case} car length",
                        f"{right - left:.0f}px, expected about {length:.0f}px")
             gate.check(abs((left + right) / 2 - want_x) <= 0.15 * length, f"{case} car at the band's right end",

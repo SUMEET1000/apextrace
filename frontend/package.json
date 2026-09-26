@@ -10,10 +10,13 @@
     "typecheck": "tsc -b --noEmit"
   },
   "dependencies": {
+    "gsap": "3.12.5",
+    "lenis": "1.1.13",
     "plotly.js": "3.7.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-plotly.js": "^4.0.0"
+    "react-plotly.js": "^4.0.0",
+    "three": "0.160.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",

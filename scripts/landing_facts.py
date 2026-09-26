@@ -160,7 +160,7 @@ def build() -> dict:
         + [{"label": f"{DRIVER_B}_other", "value": r(sum(c["delta_s"] for c in rest)),
             "turns": [turn(c["label"]) for c in rest]}]
         + [{"label": "straights", "value": r(sum(s["delta_s"] for s in straights)),
-            "turns": []}]
+            "turns": [], "count": len(straights)}]
     )
 
     deg = {row["Compound"]: {"s_per_lap": r(row["deg_s_per_lap"]), "ci_low": r(row["ci_low"]),

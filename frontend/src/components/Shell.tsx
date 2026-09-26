@@ -6,11 +6,18 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Link, NavLink } from '../lib/router';
+import { Link, NavLink, useLocation } from '../lib/router';
 
 const ROUTES = [
   { to: '/corner-analysis', label: 'Corners' },
   { to: '/race-arc', label: 'Race arc' },
+];
+// On the landing the links are 08's, to its own sections.
+const SECTIONS = [
+  { to: '#questions', label: 'Questions' },
+  { to: '#method', label: 'Method' },
+  { to: '#proof', label: 'Data' },
+  { to: '#author', label: 'Author' },
 ];
 
 function useEngine(): { text: string; live: boolean } {
@@ -36,13 +43,14 @@ function useEngine(): { text: string; live: boolean } {
 
 export function Header() {
   const engine = useEngine();
+  const landing = useLocation().pathname === '/';
   return (
     <header>
       <Link to="/" className="k">Apex<span className="wg">Trace</span></Link>
       <nav className="lab" aria-label="Pages">
-        {ROUTES.map((route) => (
-          <NavLink key={route.to} to={route.to}>{route.label}</NavLink>
-        ))}
+        {landing
+          ? SECTIONS.map((s) => <a key={s.to} href={s.to}>{s.label}</a>)
+          : ROUTES.map((route) => <NavLink key={route.to} to={route.to}>{route.label}</NavLink>)}
       </nav>
       <span className="hdr-r">
         <span className={engine.live ? 'lab eng live' : 'lab eng'} role="status">{engine.text}</span>
