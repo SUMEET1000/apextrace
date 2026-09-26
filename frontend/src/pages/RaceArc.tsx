@@ -10,6 +10,7 @@ import {
   Caption, Columns, Expander, Info, Kerb, Kicker, Metric, Section, Slider,
   Stack, Subheader, Success, Tabs, Verdict, Warning, MultiSelect,
 } from '../components/ui/primitives';
+import { Empty, ErrorState, Loading } from '../components/states';
 import {
   fetchRaceArc, fetchSession, fetchUndercut, useAsync,
 } from '../lib/api';
@@ -65,8 +66,14 @@ export function RaceArcPage({ selection }: { selection: Selection }) {
     </SidebarSection>
   );
 
+  if (session.error) {
+    return <ErrorState message={session.error} onRetry={session.retry} />;
+  }
   if (!session.data) {
-    return <Section><div className="pw-chart-skeleton" style={{ height: 220 }} /></Section>;
+    return <Loading what="the session" />;
+  }
+  if (session.data.drivers.length === 0) {
+    return <Empty>This session has no drivers stored, so there is no race to analyse.</Empty>;
   }
 
   const header = (
@@ -79,13 +86,11 @@ export function RaceArcPage({ selection }: { selection: Selection }) {
   );
 
   if (arc.error) {
-    return (<>{sidebar}{header}<Section><Warning>{arc.error}</Warning></Section></>);
+    return (<>{sidebar}{header}<ErrorState message={arc.error} onRetry={arc.retry} /></>);
   }
   if (!arc.data) {
     return (
-      <>{sidebar}{header}
-        <Section><div className="pw-chart-skeleton" style={{ height: 400 }} /></Section>
-      </>
+      <>{sidebar}{header}<Loading what="the race analysis" /></>
     );
   }
 
@@ -553,6 +558,9 @@ function UndercutSection(
     [gapS, advantage, degRate],
   );
 
+  if (result.error) {
+    return <ErrorState message={result.error} onRetry={result.retry} />;
+  }
   const breakeven = result.data?.breakeven_lap ?? null;
   const maxGain = result.data?.max_gain ?? 0;
 

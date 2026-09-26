@@ -5,10 +5,10 @@
  * production, so neither environment needs a host baked into the client.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   CornerAnalysisResponse, HomeResponse, ManifestResponse, RaceArcResponse,
-  SessionResponse, ThemeResponse, UndercutResponse, Circuit,
+  SessionResponse, UndercutResponse, Circuit,
 } from './types';
 
 const API_BASE = '/api';
@@ -45,9 +45,6 @@ function query(params: Record<string, string | number | null | undefined>): stri
   const encoded = search.toString();
   return encoded ? `?${encoded}` : '';
 }
-
-export const fetchTheme = (s?: AbortSignal) =>
-  get<ThemeResponse>('/theme', s);
 
 export const fetchManifest = (s?: AbortSignal) =>
   get<ManifestResponse>('/manifest', s);
@@ -101,15 +98,19 @@ export interface Async<T> {
   loading: boolean;
   /** True whenever a request is in flight, including over stale data. */
   fetching: boolean;
+  /** Runs the request again, for an error state's Retry button. */
+  retry: () => void;
 }
 
 export function useAsync<T>(
   load: ((signal: AbortSignal) => Promise<T>) | null,
   deps: unknown[],
 ): Async<T> {
-  const [state, setState] = useState<Async<T>>({
+  const [state, setState] = useState<Omit<Async<T>, 'retry'>>({
     data: undefined, error: null, loading: load !== null, fetching: load !== null,
   });
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
   // Held across renders so a refetch can keep showing the previous answer.
   const previous = useRef<T | undefined>(undefined);
 
@@ -143,7 +144,7 @@ export function useAsync<T>(
     );
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, attempt]);
 
-  return state;
+  return { ...state, retry };
 }

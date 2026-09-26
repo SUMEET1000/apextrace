@@ -4,6 +4,7 @@ import { App } from './App';
 import { QueryProvider } from './lib/router';
 import { ThemeProvider } from './lib/theme';
 import './styles/global.css';
+import './styles/legacy.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

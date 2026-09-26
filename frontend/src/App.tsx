@@ -1,19 +1,19 @@
-/** The app shell: sidebar, session picker, and the three routes.
+/** The app shell: 08's header and footer around one route.
  *
- * The manifest and the session picker live here rather than in each page,
- * because the picker is shared by all three and the selected session has to
- * survive navigation — exactly as it did when Streamlit ran `session_picker`
- * at the top of every script.
+ * The shell renders at once and never waits on the API: a cold Render wake
+ * takes about 46 s, and the header and the waking message are what a visitor
+ * sees meanwhile. The manifest, the opener and the session picker belong to the
+ * two analysis routes only.
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { Footer, Header } from './components/Shell';
 import { Sidebar, SidebarSlot } from './components/Sidebar';
 import { SessionPicker, type Selection } from './components/SessionPicker';
-import { ErrorBox } from './components/ui/primitives';
+import { Empty, ErrorState, Loading } from './components/states';
 import { useReveal } from './hooks/useReveal';
 import { fetchManifest, fetchOpener, useAsync } from './lib/api';
-import { useLocation } from './lib/router';
-import { HomePage } from './pages/Home';
+import { Link, useLocation } from './lib/router';
 import { CornerAnalysisPage } from './pages/CornerAnalysis';
 import { RaceArcPage } from './pages/RaceArc';
 
@@ -24,6 +24,30 @@ const PREFERRED: Record<string, string[]> = {
 
 export function App() {
   const { pathname, search } = useLocation();
+  const analysis = pathname === '/corner-analysis' || pathname === '/race-arc';
+  return (
+    <>
+      <Header />
+      <main className="shell-main">
+        {analysis ? <Analysis pathname={pathname} search={search} /> : <LandingPending />}
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+/** Holds `/` until the landing is ported in Phase 2B Step 3. */
+function LandingPending() {
+  return (
+    <div className="shell-note">
+      <span className="lab">The front page is being rebuilt</span>
+      <Link to="/corner-analysis" className="btn"><span>Open the analysis</span><span>↗</span></Link>
+    </div>
+  );
+}
+
+/** Corner Analysis and Race Arc, the pre-2B pages, until Steps 5 and 6 replace them. */
+function Analysis({ pathname, search }: { pathname: string; search: string }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   // Open on a desktop, closed on a phone — below 900px the rail is an overlay
   // drawer and would otherwise cover the page it is meant to control.
@@ -47,51 +71,43 @@ export function App() {
   }, []);
 
   if (manifest.loading || opener.loading) {
-    return <div className="pw-boot">Loading the session manifest…</div>;
+    return <Loading what="the session list" />;
   }
-
   if (manifest.error || !manifest.data) {
-    return (
-      <div className="pw-boot">
-        <ErrorBox>
-          <p><b>Could not reach the ApexTrace API.</b> {manifest.error}</p>
-          <p>Start it with:</p>
-          <pre>.venv/Scripts/python scripts/run_dev.py</pre>
-        </ErrorBox>
-      </div>
-    );
+    return <ErrorState message={manifest.error ?? 'No answer'} onRetry={manifest.retry} />;
   }
 
-  const { sessions, years, featured } = manifest.data;
+  const { sessions, years } = manifest.data;
+  if (sessions.length === 0) {
+    return <Empty>No sessions have been built yet, so there is nothing to analyse.</Empty>;
+  }
 
   let page = null;
   if (selection) {
-    if (pathname === '/corner-analysis') {
-      page = <CornerAnalysisPage selection={selection} />;
-    } else if (pathname === '/race-arc') {
-      page = <RaceArcPage selection={selection} />;
-    } else {
-      page = <HomePage selection={selection} featured={featured} search={search} />;
-    }
+    page = pathname === '/corner-analysis'
+      ? <CornerAnalysisPage selection={selection} />
+      : <RaceArcPage selection={selection} />;
   }
 
   return (
     <SidebarSlot.Provider value={slot}>
-      <div className="pw-app">
-        <Sidebar
-          search={search} slotRef={slotRef}
-          open={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)}
-        >
-          <SessionPicker
-            sessions={sessions} years={years}
-            openerSlug={opener.data?.slug}
-            onChange={setSelection}
-          />
-        </Sidebar>
+      <div className="pw-legacy">
+        <div className="pw-app">
+          <Sidebar
+            search={search} slotRef={slotRef}
+            open={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)}
+          >
+            <SessionPicker
+              sessions={sessions} years={years}
+              openerSlug={opener.data?.slug}
+              onChange={setSelection}
+            />
+          </Sidebar>
 
-        <div className="pw-content">
-          <div className="pw-block-container">
-            <div className="pw-main" ref={main}>{page}</div>
+          <div className="pw-content">
+            <div className="pw-block-container">
+              <div className="pw-main" ref={main}>{page}</div>
+            </div>
           </div>
         </div>
       </div>

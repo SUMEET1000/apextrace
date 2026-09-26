@@ -98,15 +98,6 @@ export function SessionPicker(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug, meta, year, round, session]);
 
-  if (sessions.length === 0) {
-    return (
-      <ErrorBox>
-        <p>No sessions have been built yet. Run:</p>
-        <pre>python scripts/build_dataset.py --years 2024 --sessions Q R</pre>
-      </ErrorBox>
-    );
-  }
-
   if (!meta) {
     return (
       <ErrorBox>

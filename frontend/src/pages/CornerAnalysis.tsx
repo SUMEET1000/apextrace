@@ -12,6 +12,7 @@ import {
   Caption, Columns, Expander, Info, Kerb, Kicker, Metric, Section, Select,
   Subheader, Success, RadioGroup, Toggle, Warning,
 } from '../components/ui/primitives';
+import { Empty, ErrorState, Loading } from '../components/states';
 import { fetchCornerAnalysis, fetchSession, useAsync } from '../lib/api';
 import {
   article, fmt, fmtDelta, fmtLaptime, joinProse,
@@ -135,12 +136,11 @@ export function CornerAnalysisPage({ selection }: { selection: Selection }) {
 
   // ---- guards ---------------------------------------------------------
 
+  if (session.error) {
+    return <ErrorState message={session.error} onRetry={session.retry} />;
+  }
   if (!data) {
-    return (
-      <Section>
-        <div className="pw-chart-skeleton" style={{ height: 220 }} />
-      </Section>
-    );
+    return <Loading what="the session" />;
   }
 
   const header = (
@@ -153,12 +153,12 @@ export function CornerAnalysisPage({ selection }: { selection: Selection }) {
   );
 
   if (!data.has_telemetry) {
-    return (<>{header}<Section><Warning>No telemetry stored for this session.</Warning></Section></>);
+    return (<>{header}<Empty>No telemetry is stored for this session.</Empty></>);
   }
   if (drivers.length < 2) {
     return (
       <>{header}
-        <Section><Warning>Need at least two drivers with telemetry to compare.</Warning></Section>
+        <Empty>This session has fewer than two drivers with telemetry, so there is nothing to compare.</Empty>
       </>
     );
   }
@@ -172,15 +172,13 @@ export function CornerAnalysisPage({ selection }: { selection: Selection }) {
   if (analysis.error) {
     return (
       <>{sidebar}{header}
-        <Section><Warning>{analysis.error}</Warning></Section>
+        <ErrorState message={analysis.error} onRetry={analysis.retry} />
       </>
     );
   }
   if (!analysis.data) {
     return (
-      <>{sidebar}{header}
-        <Section><div className="pw-chart-skeleton" style={{ height: 400 }} /></Section>
-      </>
+      <>{sidebar}{header}<Loading what="the comparison" /></>
     );
   }
 
