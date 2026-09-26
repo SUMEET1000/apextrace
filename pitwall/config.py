@@ -365,7 +365,7 @@ FEATURED_SESSIONS = (
         "slug": "2024/01_R",
         "page": "pages/2_Race_Arc.py",
         "title": "Bahrain 2024 · how fast the soft went away",
-        "blurb": "Soft 0.123 s/lap against hard 0.105 s/lap, with the "
+        "blurb": "Soft 0.116 s/lap against hard 0.105 s/lap, with the "
                  "confidence intervals that say whether to believe it.",
         "params": {"view": "Tyre Degradation"},
     },
@@ -373,8 +373,8 @@ FEATURED_SESSIONS = (
         "slug": "2024/01_R",
         "page": "pages/2_Race_Arc.py",
         "title": "Bahrain 2024 · the track sped up while lap times slowed",
-        "blurb": "A trend line says the circuit lost 1.053 s. With tyre and "
-                 "fuel removed it gained 0.292 s — the naive read has the "
+        "blurb": "A trend line says the circuit lost 1.013 s. With tyre and "
+                 "fuel removed it gained 0.372 s — the naive read has the "
                  "sign wrong, not just the size.",
         "params": {"view": "Track Evolution"},
     },

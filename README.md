@@ -35,13 +35,13 @@ application.
 
 > Silverstone 2024 qualifying, Russell vs Verstappen: Russell is **0.384 s**
 > faster, of which **0.326 s** comes from the corners and **0.058 s** from the
-> straights. Verstappen's biggest gains are Vale (**−0.198 s**), Village
-> (−0.096 s) and Luffield (−0.075 s) — the three heaviest braking zones.
+> straights. Verstappen's biggest gains are Vale (**−0.200 s**), Village
+> (−0.096 s) and Luffield (−0.074 s) — the three heaviest braking zones.
 
 **"How fast is this tyre going away?"** Per-stint regression of fuel-corrected
 lap time on tyre age, pooled across the field by inverse variance.
 
-> Bahrain 2024: soft **0.123 s/lap** (95% CI 0.113–0.133, 25 stints) versus
+> Bahrain 2024: soft **0.116 s/lap** (95% CI 0.106–0.127, 25 stints) versus
 > hard **0.105 s/lap** (95% CI 0.101–0.109, 37 stints).
 
 **"How much of the pace gain was the track?"** See below — this is the part
@@ -116,8 +116,8 @@ start, where the plotted quantity is a number minus itself.
 
 Two independent checks that the model is doing what it claims:
 
-- The per-compound degradation it recovers as a by-product (hard 0.107, soft
-  0.117 s/lap) reproduces the separate per-stint fits (0.105, 0.123 s/lap),
+- The per-compound degradation it recovers as a by-product (hard 0.106, soft
+  0.121 s/lap) reproduces the separate per-stint fits (0.105, 0.116 s/lap),
   which are computed by an entirely different route.
 - On synthetic races with known parameters, the model recovers both effects
   simultaneously — and
