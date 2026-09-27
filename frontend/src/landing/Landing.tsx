@@ -71,11 +71,11 @@ export function Landing() {
   useEffect(() => {
     const node = root.current!;
     let stopCar: (() => void) | null = null, gone = false;
-    const stop = boot(node, F, () => {
-      if (innerWidth >= 860 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-        import('./car').then((car) => { if (!gone) stopCar = car.startCar(node); });
-      }
-    });
+    const stop = boot(node, F);
+    if (innerWidth >= 860 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      const introAt = performance.now() + 3300;
+      import('./car').then((car) => { if (!gone) stopCar = car.startCar(node, introAt); });
+    }
     return () => { gone = true; stopCar?.(); stop(); };
   }, []);
 
@@ -149,8 +149,8 @@ export function Landing() {
         <span className="lab">METHOD · HOW EACH NUMBER IS WORKED OUT</span>
         <h2 className="k" data-split style={{ fontSize: 'clamp(60px,9vw,170px)', marginTop: 14 }}>How it knows</h2>
         <div className="tl">
-          <div className="st" data-n="1" data-reveal><h3>Corner segmentation</h3><div className="eq">Δt = Σ<sub>segments</sub> (t<sub>{F.lap.b.code}</sub> − t<sub>{F.lap.a.code}</sub>)</div><p>The lap is cut into {CORNERS} corners and the straights between them. Δt, the gap between the two drivers, is the sum of the gaps in every piece, so each hundredth of a second lands in exactly one piece.</p></div>
-          <div className="st" data-n="2" data-reveal><h3>Inverse-variance pooling</h3><div className="eq">β̂ = Σ w<sub>i</sub>β<sub>i</sub> / Σ w<sub>i</sub>,&nbsp; w<sub>i</sub> = 1/σ<sub>i</sub>²</div><p>Each stint gives one slope: seconds lost per lap as the tyre wears, after removing the gain from fuel burning off. The slopes are averaged across all drivers, and a stint with a more certain slope (smaller σ) counts for more. The 95% confidence interval is always shown.</p></div>
+          <div className="st" data-n="1" data-reveal><h3>Corner segmentation</h3><div className="eq">Δt = Σ<sub>segments</sub> (t<sub>{F.lap.b.code}</sub> − t<sub>{F.lap.a.code}</sub>)</div><p>The lap is divided into {CORNERS} corners and the straights between them. Δt, the gap between the two drivers, is the sum of the gaps in every piece, so that each hundredth of a second falls in exactly one piece.</p></div>
+          <div className="st" data-n="2" data-reveal><h3>Inverse-variance pooling</h3><div className="eq">β̂ = Σ w<sub>i</sub>β<sub>i</sub> / Σ w<sub>i</sub>,&nbsp; w<sub>i</sub> = 1/σ<sub>i</sub>²</div><p>Each stint provides a single slope: seconds lost per lap as the tyre wears, after removing the gain from fuel burning off. The slopes are averaged over all drivers, and a stint with a more certain slope (smaller σ) is weighted more highly. The 95% confidence interval is always displayed.</p></div>
           <div className="st" data-n="3" data-reveal><h3>Collinearity, argued</h3><div className="eq">lap time ~ track + tyre age + fuel</div><p>Track grip, tyre age and fuel load all change lap by lap, together, so their effects are tangled (the statistical name is collinear). The model says when they can be separated, and says so when they cannot.</p></div>
         </div>
       </section>
@@ -161,7 +161,7 @@ export function Landing() {
         <div className="spec" data-reveal>
           <div className="sp"><b>{F.spec.sessions}</b><span>Sessions</span><p>F1 practice, qualifying, sprint and race sessions, each with lap times and car telemetry.</p></div>
           <div className="sp"><b>{F.spec.seasons}</b><span>Seasons</span><p>{F.spec.years.join(', ')}. Latest stored season through round {F.spec.latest_round}.</p></div>
-          <div className="sp"><b>{F.spec.tests}</b><span>Tests</span><p>Automated checks on the analysis and the API. They run on every code change.</p></div>
+          <div className="sp"><b>{F.spec.tests}</b><span>Tests</span><p>Automated tests on the analysis and the API. They run on every code change.</p></div>
           <div className="sp"><b>{F.spec.data_mib}</b><span>MiB of data</span><p>Cleaned F1 timing data from the FastF1 library, stored as Parquet files.</p></div>
         </div>
       </section>

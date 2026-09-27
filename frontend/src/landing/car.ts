@@ -1,8 +1,8 @@
 // @ts-nocheck - ported, not rewritten (Phase 2B D6): the guide car module of
 // landings/08-finished.html. What changed: three comes from npm (Landing.tsx
 // imports this file only at >= 860 px without reduced motion, so phones never
-// download it), the canvas is created here, the drive-in starts when the loader
-// is removed instead of 3.3 s after load, and the returned cleanup removes
+// download it), the canvas is created here, the drive-in starts 3.3 s after
+// landing initialization, and the returned cleanup removes
 // every listener, trigger and GPU resource.
 // Guide car: an F1 car built in code on photos of the RB20 (2024), in its livery colours with no
 // logos or text beyond the number 1. It drives in from the left of the hero, runs down the gap beside the
@@ -23,7 +23,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 
 const D = document, DEG = Math.PI / 180, TILT = 74 * DEG, LEN = 5.45;
 
-export function startCar(host) {
+export function startCar(host, introAt) {
   const cv = D.createElement('canvas'); cv.id = 'car'; cv.setAttribute("aria-hidden", "true"); host.append(cv);
   const undo = [], on = (t, type, fn, o) => { t.addEventListener(type, fn, o); undo.push(() => t.removeEventListener(type, fn, o)); };
   const ctx = gsap.context(() => {});
@@ -257,7 +257,6 @@ export function startCar(host) {
     return { x, y, h: mix(Math.atan2(dy, dx) / DEG, 180, w), v: w, L: lapL() + (P.L - lapL()) * w };
   };
 
-  const introAt = performance.now();
   const keys = [
     { s: () => 0, at: introAt, timed: { dur: 1800, fn: t => { const [x, y] = heroPos(), L = heroL(), e = 1 - (1 - t) ** 3; return { x: innerWidth + L - (innerWidth + L - x) * e, y, h: 180, v: .3 + .7 * Math.max(0, (t - .55) / .45), L }; } } },
     ...lis.flatMap((_, i) => [{ s: rowS(i, 0), pos: rowPos(i), h: 90, L: gapL, lin: true }, { s: i === lis.length - 1 ? () => pin().end : rowS(i, .6), pos: rowPos(i), h: 90, L: gapL }]),

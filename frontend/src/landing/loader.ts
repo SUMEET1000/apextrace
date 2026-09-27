@@ -4,7 +4,8 @@
  * On `/` it holds even on cached visits; it never waits on the API.
  * Anywhere else, and with reduced motion, it goes at once.
  * `lifting` resolves when it starts to slide up (the hero enters
- * 450 ms later, as in 08). The guide car starts after the hero entrance.
+ * 450 ms later, as in 08). The guide car initializes during the hold and
+ * drives in on its own clock.
  */
 
 export const HERO_IMAGE = '/img/sensor.png';
