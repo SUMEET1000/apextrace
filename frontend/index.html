@@ -9,9 +9,59 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --acc: #F2E600;
+        --ink: #131313;
+        --paper: #E7E7E3;
+        --bw: 2px;
+        --fd: 'Archivo Black', sans-serif;
+        --fm: 'IBM Plex Mono', monospace;
+      }
+      body { margin: 0; background: var(--paper); color: var(--ink); }
+      #loader { position: fixed; inset: 0; z-index: 100; background: var(--acc); display: grid; place-items: center;
+        transition: transform .9s cubic-bezier(.8,0,.2,1); animation: loader-fallback .9s cubic-bezier(.8,0,.2,1) 6s forwards; }
+      #loader.done { transform: translateY(-100%); }
+      #loader .k { font-family: var(--fd); font-size: clamp(60px,12vw,200px); text-align: center; line-height: .9; text-transform: uppercase; }
+      #loader .bar { width: 60vw; height: 18px; border: var(--bw) solid var(--ink); margin: 24px auto 10px; }
+      #loader i { display: block; height: 100%; background: var(--ink); transform-origin: left; transform: scaleX(0); }
+      #loader .lab { font-family: var(--fm); font-size: 13px; font-weight: 500; letter-spacing: .04em; }
+      @keyframes loader-fallback { to { transform: translateY(-100%); } }
+    </style>
   </head>
   <body>
     <div id="loader"><div><div class="k">Printing<br>the lap</div><div class="bar"><i data-bar></i></div><div class="lab" style="text-align:center">LOADING THE PAGE · <span data-pct>000</span> / 100</div></div></div>
+    <script>
+      if (location.pathname !== '/' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        const L = document.getElementById('loader');
+        if (L) L.style.display = 'none';
+      } else {
+        const L = document.getElementById('loader');
+        const bar = L ? L.querySelector('[data-bar]') : null;
+        const pct = L ? L.querySelector('[data-pct]') : null;
+        const HOLD_MS = 2600;
+        const LIFT_MS = 900;
+        const step = now => {
+          if (!L || L.classList.contains('done') || !L.isConnected) return;
+          const k = Math.min(1, now / HOLD_MS);
+          const eased = 1 - (1 - k) ** 3;
+          if (bar) bar.style.transform = 'scaleX(' + eased + ')';
+          if (pct) pct.textContent = String(Math.round(eased * 100)).padStart(3, '0');
+          if (k < 1) { requestAnimationFrame(step); return; }
+          L.classList.add('done');
+          const at = performance.now();
+          window.__loaderLifting = at;
+          if (window.__onLoaderLifting) window.__onLoaderLifting(at);
+          setTimeout(() => {
+            const atLifted = performance.now();
+            window.__loaderLifted = atLifted;
+            if (window.__onLoaderLifted) window.__onLoaderLifted(atLifted);
+            L.remove();
+          }, LIFT_MS);
+        };
+        requestAnimationFrame(step);
+      }
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

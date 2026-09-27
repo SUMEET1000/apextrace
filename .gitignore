@@ -23,6 +23,11 @@ DESIGN_PROGRESS.md
 PLAYBOOK.md
 PLANS/
 
+# Impeccable's own artefacts, ignored on Sumeet's instruction 22 Sept 2026.
+# PRODUCT.md is written by its `init`, DESIGN.md by `new-work`.
+PRODUCT.md
+DESIGN.md
+
 # Logs and backups
 *.bak
 backfill.log
@@ -36,3 +41,6 @@ backfill.log
 
 # playwright-cli writes page snapshots here on every run
 .playwright-cli/
+
+# Impeccable workflow config (buildPath, live mode). Not product truth.
+.impeccable/

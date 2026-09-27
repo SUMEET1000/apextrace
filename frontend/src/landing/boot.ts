@@ -246,7 +246,6 @@ export function boot(root, F) {
       const hero = gsap.timeline({ paused: true }).from(['.hero .photo', '.panel', '.stage', ...root.querySelectorAll('.hero .ann')].map(s => typeof s === 'string' ? root.querySelector(s) : s),
         { ...FROM.rise(DIST), duration: 1, ease: 'power3.out', stagger: .1 });
       lifting.then(at => { if (alive) later(() => hero.play(), Math.max(0, at + 450 - performance.now())); });
-      lifted.then(() => { if (alive) hero.progress(1); });
 
       // Reveals.
       root.querySelectorAll('[data-split]').forEach(h => {

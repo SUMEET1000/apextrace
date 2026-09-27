@@ -12,6 +12,15 @@ export const HERO_IMAGE = '/img/sensor.png';
 const HOLD_MS = 2600;
 const LIFT_MS = 900;   // the .done transition in landing.css
 
+declare global {
+  interface Window {
+    __loaderLifting?: number;
+    __loaderLifted?: number;
+    __onLoaderLifting?: (at: number) => void;
+    __onLoaderLifted?: (at: number) => void;
+  }
+}
+
 let resolveLifting: (at: number) => void;
 let resolveLifted: (at: number) => void;
 export const lifting = new Promise<number>((resolve) => { resolveLifting = resolve; });
@@ -19,23 +28,48 @@ export const lifted = new Promise<number>((resolve) => { resolveLifted = resolve
 
 export function startLoader(): void {
   const loader = document.getElementById('loader');
-  const done = () => { loader?.remove(); resolveLifting(performance.now()); resolveLifted(performance.now()); };
+  const done = (at = performance.now()) => {
+    loader?.remove();
+    resolveLifting(at);
+    resolveLifted(at);
+  };
   if (!loader || location.pathname !== '/' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
     done();
     return;
   }
+
+  if (window.__loaderLifted) {
+    done(window.__loaderLifted);
+    return;
+  }
+  if (window.__loaderLifting) {
+    resolveLifting(window.__loaderLifting);
+    window.__onLoaderLifted = (at) => resolveLifted(at);
+    return;
+  }
+
+  window.__onLoaderLifting = (at) => resolveLifting(at);
+  window.__onLoaderLifted = (at) => resolveLifted(at);
+
   const bar = loader.querySelector<HTMLElement>('[data-bar]');
   const pct = loader.querySelector<HTMLElement>('[data-pct]');
-  // Count from navigation start, including the script download.
   const step = (now: number) => {
+    if (loader.classList.contains('done') || !loader.isConnected) return;
     const k = Math.min(1, now / HOLD_MS);
     const eased = 1 - (1 - k) ** 3;
     if (bar) bar.style.transform = `scaleX(${eased})`;
     if (pct) pct.textContent = String(Math.round(eased * 100)).padStart(3, '0');
     if (k < 1) { requestAnimationFrame(step); return; }
     loader.classList.add('done');
-    resolveLifting(performance.now());
-    setTimeout(done, LIFT_MS);
+    const at = performance.now();
+    window.__loaderLifting = at;
+    resolveLifting(at);
+    setTimeout(() => {
+      const atLifted = performance.now();
+      window.__loaderLifted = atLifted;
+      loader.remove();
+      resolveLifted(atLifted);
+    }, LIFT_MS);
   };
   requestAnimationFrame(step);
 }
