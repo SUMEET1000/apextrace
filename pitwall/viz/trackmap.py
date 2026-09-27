@@ -61,9 +61,9 @@ def _smooth(values: np.ndarray, window: int) -> np.ndarray:
         return np.where(finite & (count > 0), total / count, np.nan)
 
 
-def _ribbon(fig: go.Figure, x: np.ndarray, y: np.ndarray, values: np.ndarray,
-            colourscale: list, vmin: float, vmax: float) -> None:
-    """Draw the outline as mini-sectors, each a constant colour.
+def _ribbon_data(x: np.ndarray, y: np.ndarray, values: np.ndarray,
+                 colourscale: list, vmin: float, vmax: float) -> list[dict]:
+    """Split the outline into mini-sectors, each with one measured colour.
 
     Consecutive bins share their boundary sample, so the ribbon is continuous
     rather than a dashed line of separate pieces, and the final bin closes back
@@ -76,16 +76,11 @@ def _ribbon(fig: go.Figure, x: np.ndarray, y: np.ndarray, values: np.ndarray,
     n = len(x)
     bins = min(TRACKMAP_MINI_SECTORS, n)
     if bins < 2:
-        return
-
-    fig.add_trace(go.Scatter(
-        x=np.append(x, x[0]), y=np.append(y, y[0]), mode="lines",
-        line=dict(color=GLOW_COLOUR, width=GLOW_WIDTH, shape="spline"),
-        hoverinfo="skip", showlegend=False,
-    ))
+        return []
 
     edges = np.linspace(0, n, bins + 1).astype(int)
     span = (vmax - vmin) or 1e-9
+    sectors = []
     for lo, hi in zip(edges[:-1], edges[1:]):
         if hi <= lo:
             continue
@@ -101,9 +96,23 @@ def _ribbon(fig: go.Figure, x: np.ndarray, y: np.ndarray, values: np.ndarray,
             seg_x, seg_y = x[lo:hi + 1], y[lo:hi + 1]
         else:
             seg_x, seg_y = np.append(x[lo:], x[0]), np.append(y[lo:], y[0])
+        sectors.append(dict(x=seg_x, y=seg_y, value=value, colour=colour))
+    return sectors
+
+
+def _ribbon(fig: go.Figure, x: np.ndarray, y: np.ndarray,
+            sectors: list[dict]) -> None:
+    if len(x) < 2:
+        return
+    fig.add_trace(go.Scatter(
+        x=np.append(x, x[0]), y=np.append(y, y[0]), mode="lines",
+        line=dict(color=GLOW_COLOUR, width=GLOW_WIDTH, shape="spline"),
+        hoverinfo="skip", showlegend=False,
+    ))
+    for sector in sectors:
         fig.add_trace(go.Scatter(
-            x=seg_x, y=seg_y, mode="lines",
-            line=dict(color=colour, width=RIBBON_WIDTH, shape="spline"),
+            x=sector["x"], y=sector["y"], mode="lines",
+            line=dict(color=sector["colour"], width=RIBBON_WIDTH, shape="spline"),
             hoverinfo="skip", showlegend=False,
         ))
 
@@ -132,15 +141,21 @@ def _start_finish(fig: go.Figure, x: np.ndarray, y: np.ndarray) -> None:
     )
 
 
-def _corner_labels(fig: go.Figure, corners: pd.DataFrame | None) -> None:
+def _corner_labels_data(corners: pd.DataFrame | None) -> dict:
     if corners is None or corners.empty or not {"X", "Y"}.issubset(corners.columns):
-        return
+        return dict(x=[], y=[], labels=[])
     rotation = float(corners["Rotation"].iloc[0]) if "Rotation" in corners else 0.0
     cx, cy = _rotate(corners["X"].to_numpy(dtype=float),
                      corners["Y"].to_numpy(dtype=float), rotation)
+    return dict(x=cx, y=cy, labels=corners["CornerLabel"].astype(str).tolist())
+
+
+def _corner_labels(fig: go.Figure, data: dict) -> None:
+    if not data["labels"]:
+        return
     fig.add_trace(go.Scatter(
-        x=cx, y=cy, mode="text",
-        text=corners["CornerLabel"].astype(str),
+        x=data["x"], y=data["y"], mode="text",
+        text=data["labels"],
         textfont=dict(color=theme.INK_MUTED, size=10),
         hoverinfo="skip", showlegend=False,
     ))
@@ -174,6 +189,37 @@ def _map_layout(fig: go.Figure, height: int) -> go.Figure:
     return fig
 
 
+def speed_delta_map_data(track: pd.DataFrame, lap_a: pd.DataFrame,
+                         lap_b: pd.DataFrame, *, name_a: str, name_b: str,
+                         corners: pd.DataFrame | None = None) -> dict:
+    if track.empty:
+        return dict(x=[], y=[], rate=[], delta_s=[], distance_m=[], readable=[],
+                    limit=1e-6, sectors=[], corners=_corner_labels_data(corners),
+                    x_unit="position units", y_unit="position units", colour_unit="s per sample",
+                    finding="No circuit map is available.")
+    n = min(len(track), len(lap_a), len(lap_b))
+    x, y = track["X"].to_numpy()[:n], track["Y"].to_numpy()[:n]
+    delta = delta_time(lap_a, lap_b)[:n]
+    rate = _smooth(np.gradient(delta), max(3, n // 50)) if n else np.array([])
+    known = np.isfinite(rate)
+    limit = float(np.nanpercentile(np.abs(rate), 98)) if known.any() else 0.0
+    if not np.isfinite(limit) or limit == 0.0:
+        limit = 1e-6
+    readable = known & np.isfinite(delta)
+    distance = track["Distance"].to_numpy()[:n]
+    strongest = int(np.nanargmax(np.abs(rate))) if known.any() else None
+    return dict(x=x, y=y, rate=rate, delta_s=delta,
+                distance_m=distance,
+                readable=readable, limit=limit,
+                sectors=_ribbon_data(x, y, rate, theme.DIVERGING, -limit, limit),
+                corners=_corner_labels_data(corners),
+                x_unit="position units", y_unit="position units",
+                colour_unit="s per sample",
+                finding=(f"The largest local gap change between {name_a} and {name_b} "
+                         f"is near {distance[strongest]:.0f} m."
+                         if strongest is not None else "No comparable lap samples are available."))
+
+
 def speed_delta_map(
     track: pd.DataFrame,
     lap_a: pd.DataFrame,
@@ -196,32 +242,18 @@ def speed_delta_map(
     if track.empty:
         return _map_layout(go.Figure(), height)
 
-    n = min(len(track), len(lap_a), len(lap_b))
-    x = track["X"].to_numpy()[:n]
-    y = track["Y"].to_numpy()[:n]
-
-    delta = delta_time(lap_a, lap_b)[:n]
-    # Rate of change of the gap, smoothed over ~2% of the lap so the colour
-    # shows corner-scale trends rather than sample noise.
-    window = max(3, n // 50)
-    rate = _smooth(np.gradient(delta), window)
-
-    # Where neither lap covers the track there is no gap to describe. The
-    # scale has to be set from the samples that exist, or one NaN makes every
-    # limit NaN and the colour lookup fails outright.
-    known = np.isfinite(rate)
-    limit = float(np.nanpercentile(np.abs(rate), 98)) if known.any() else 0.0
-    if not np.isfinite(limit) or limit == 0.0:
-        limit = 1e-6
+    data = speed_delta_map_data(track, lap_a, lap_b, name_a=name_a,
+                                name_b=name_b, corners=corners)
+    x, y, rate, delta = data["x"], data["y"], data["rate"], data["delta_s"]
+    limit, readable = data["limit"], data["readable"]
 
     fig = go.Figure()
-    _ribbon(fig, x, y, rate, theme.DIVERGING, -limit, limit)
+    _ribbon(fig, x, y, data["sectors"])
 
     # Full-resolution readout, laid invisibly over the ribbon so the binning
     # costs no hover detail, and carrying the colourbar - a line trace cannot.
     # Only the samples both laps actually recorded: a hover reading "running
     # gap NaN s" over unpainted track is worse than no hover at all.
-    readable = known & np.isfinite(delta)
     fig.add_trace(go.Scatter(
         x=x[readable], y=y[readable], mode="markers",
         marker=dict(
@@ -241,7 +273,7 @@ def speed_delta_map(
                 x=0.5, xanchor="center", y=-0.02, yanchor="top",
             ),
         ),
-        customdata=np.stack([track["Distance"].to_numpy()[:n][readable],
+        customdata=np.stack([data["distance_m"][readable],
                              delta[readable]], axis=-1),
         hovertemplate=("%{customdata[0]:.0f} m<br>"
                        "running gap %{customdata[1]:+.3f} s<extra></extra>"),
@@ -249,8 +281,30 @@ def speed_delta_map(
     ))
 
     _start_finish(fig, x, y)
-    _corner_labels(fig, corners)
+    _corner_labels(fig, data["corners"])
     return _map_layout(fig, height)
+
+
+def speed_map_data(track: pd.DataFrame, lap: pd.DataFrame, *,
+                   corners: pd.DataFrame | None = None) -> dict:
+    if track.empty:
+        return dict(x=[], y=[], speed=[], known=[], lo=0.0, hi=0.0,
+                    sectors=[], corners=_corner_labels_data(corners),
+                    x_unit="position units", y_unit="position units", colour_unit="km/h",
+                    finding="No circuit map is available.")
+    n = min(len(track), len(lap))
+    x, y = track["X"].to_numpy()[:n], track["Y"].to_numpy()[:n]
+    speed = lap["Speed"].to_numpy(dtype="float64")[:n]
+    known = np.isfinite(speed)
+    lo, hi = (float(speed[known].min()), float(speed[known].max())) if known.any() else (0.0, 0.0)
+    scale = [[0.0, "#cde2fb"], [0.5, "#3987e5"], [1.0, "#0d366b"]]
+    return dict(x=x, y=y, speed=speed, known=known, lo=lo, hi=hi,
+                sectors=_ribbon_data(x, y, speed, scale, lo, hi),
+                corners=_corner_labels_data(corners),
+                x_unit="position units", y_unit="position units",
+                colour_unit="km/h",
+                finding=(f"Speed ranges from {lo:.0f} to {hi:.0f} km/h on this lap."
+                         if known.any() else "No speed samples are available."))
 
 
 def speed_map(track: pd.DataFrame, lap: pd.DataFrame, *,
@@ -262,20 +316,18 @@ def speed_map(track: pd.DataFrame, lap: pd.DataFrame, *,
     """
     if track.empty:
         return _map_layout(go.Figure(), height)
-    n = min(len(track), len(lap))
-    x = track["X"].to_numpy()[:n]
-    y = track["Y"].to_numpy()[:n]
-    speed = lap["Speed"].to_numpy(dtype="float64")[:n]
+    data = speed_map_data(track, lap, corners=corners)
+    x, y, speed = data["x"], data["y"], data["speed"]
     scale = [[0.0, "#cde2fb"], [0.5, "#3987e5"], [1.0, "#0d366b"]]
     # A partial lap is NaN off its covered span, and a lap that is NaN
     # throughout would otherwise hand a NaN scale to the colour lookup.
-    known = np.isfinite(speed)
+    known = data["known"]
     if not known.any():
         return _map_layout(go.Figure(), height)
-    lo, hi = float(speed[known].min()), float(speed[known].max())
+    lo, hi = data["lo"], data["hi"]
 
     fig = go.Figure()
-    _ribbon(fig, x, y, speed, scale, lo, hi)
+    _ribbon(fig, x, y, data["sectors"])
     fig.add_trace(go.Scatter(
         x=x[known], y=y[known], mode="markers",
         marker=dict(
@@ -298,5 +350,5 @@ def speed_map(track: pd.DataFrame, lap: pd.DataFrame, *,
         showlegend=False,
     ))
     _start_finish(fig, x, y)
-    _corner_labels(fig, corners)
+    _corner_labels(fig, data["corners"])
     return _map_layout(fig, height)

@@ -32,6 +32,49 @@ def _corner_shapes(segments: pd.DataFrame) -> list[dict]:
     return shapes
 
 
+def trace_panel_data(lap_a: pd.DataFrame, lap_b: pd.DataFrame | None,
+                     segments: pd.DataFrame, *, name_a: str,
+                     name_b: str | None = None) -> dict:
+    laps = [(lap_a, name_a)]
+    if lap_b is not None and name_b is not None:
+        laps.append((lap_b, name_b))
+    drivers = []
+    for lap, name in laps:
+        covered = lap["Speed"].notna().to_numpy()
+        drivers.append(dict(
+            name=name, distance=lap["Distance"].to_numpy(),
+            speed=lap["Speed"].to_numpy(), throttle=lap["Throttle"].to_numpy(),
+            brake=np.where(covered, lap["Brake"].astype(float), np.nan),
+            gear=np.where(covered, lap["nGear"].astype(float), np.nan),
+            brake_state=np.where(lap["Brake"].to_numpy().astype(bool), "on", "off"),
+        ))
+    brake = lap_a["Brake"].to_numpy().astype(bool)
+    distance = drivers[0]["distance"]
+    edges = np.diff(brake.astype(int))
+    starts = list(np.flatnonzero(edges == 1) + 1)
+    ends = list(np.flatnonzero(edges == -1) + 1)
+    if brake[0]:
+        starts.insert(0, 0)
+    if brake[-1]:
+        ends.append(len(brake) - 1)
+    if len(drivers) == 2:
+        difference = np.abs(drivers[0]["speed"] - drivers[1]["speed"])
+        strongest = int(np.nanargmax(difference)) if np.isfinite(difference).any() else None
+        finding = (f"{name_a} and {name_b} differ by up to "
+                   f"{difference[strongest]:.0f} km/h near {distance[strongest]:.0f} m."
+                   if strongest is not None else "No comparable speed samples are available.")
+    else:
+        finding = f"{name_a}'s speed and controls over the lap."
+    return dict(drivers=drivers,
+                delta=delta_time(lap_a, lap_b) if len(laps) == 2 else None,
+                brake_zones=[[distance[s], distance[e]] for s, e in zip(starts, ends)],
+                corners=segments.loc[segments["kind"] == "corner",
+                                     ["apex_m", "label"]].to_dict("records"),
+                x_unit="m", y_units={"speed": "km/h", "throttle": "%",
+                                      "brake": "on/off", "gear": "gear", "delta": "s"},
+                finding=finding)
+
+
 def trace_panel(
     lap_a: pd.DataFrame,
     lap_b: pd.DataFrame | None,
@@ -47,6 +90,7 @@ def trace_panel(
     is supplied.
     """
     show_delta = lap_b is not None and name_b is not None
+    data = trace_panel_data(lap_a, lap_b, segments, name_a=name_a, name_b=name_b)
     rows = 5 if show_delta else 4
     titles = ["Speed (km/h)", "Throttle (%)", "Brake", "Gear"]
     heights = [0.40, 0.22, 0.19, 0.19]
@@ -61,12 +105,12 @@ def trace_panel(
         subplot_titles=titles,
     )
 
-    laps = [(lap_a, name_a, theme.REF_COLOUR, "solid")]
+    laps = [(data["drivers"][0], name_a, theme.REF_COLOUR, "solid")]
     if show_delta:
-        laps.append((lap_b, name_b, theme.CMP_COLOUR, "dash"))
+        laps.append((data["drivers"][1], name_b, theme.CMP_COLOUR, "dash"))
 
     for lap, name, colour, dash in laps:
-        d = lap["Distance"].to_numpy()
+        d = lap["distance"]
         common = dict(x=d, mode="lines", legendgroup=name,
                       line=dict(color=colour, width=2, dash=dash))
         # The discrete channels below are edge-held outside a partial lap's
@@ -75,28 +119,27 @@ def trace_panel(
         # is the authority on what the car actually drove; without this mask a
         # stretch of track the lap never reached reads as a held gear and a
         # confident foot off the brake.
-        covered = lap["Speed"].notna().to_numpy()
         # Only the first panel carries the legend entry; the same colour and
         # dash identify the driver in every panel below it.
         fig.add_trace(go.Scatter(
-            y=lap["Speed"], name=name, showlegend=True,
+            y=lap["speed"], name=name, showlegend=True,
             hovertemplate=f"<b>{name}</b>  %{{y:.0f}} km/h<extra></extra>", **common
         ), row=1, col=1)
         fig.add_trace(go.Scatter(
-            y=lap["Throttle"], name=name, showlegend=False,
+            y=lap["throttle"], name=name, showlegend=False,
             hovertemplate=f"{name}  %{{y:.0f}}%<extra></extra>", **common
         ), row=2, col=1)
         fig.add_trace(go.Scatter(
-            y=np.where(covered, lap["Brake"].astype(float), np.nan),
+            y=lap["brake"],
             name=name, showlegend=False,
             line_shape="hv",
             hovertemplate=f"{name}  %{{customdata}}<extra></extra>",
-            customdata=np.where(lap["Brake"].to_numpy().astype(bool), "on", "off"),
+            customdata=lap["brake_state"],
             **{k: v for k, v in common.items() if k != "line"},
             line=dict(color=colour, width=1.6, dash=dash),
         ), row=3, col=1)
         fig.add_trace(go.Scatter(
-            y=np.where(covered, lap["nGear"].astype(float), np.nan),
+            y=lap["gear"],
             name=name, showlegend=False,
             line_shape="hv",
             hovertemplate=f"{name}  gear %{{y:.0f}}<extra></extra>",
@@ -106,24 +149,16 @@ def trace_panel(
 
     # Braking zones as shaded bands on the speed panel - where the car is
     # slowing is the context every other channel is read against.
-    brake = lap_a["Brake"].to_numpy().astype(bool)
-    d_a = lap_a["Distance"].to_numpy()
-    edges = np.diff(brake.astype(int))
-    starts = list(np.flatnonzero(edges == 1) + 1)
-    ends = list(np.flatnonzero(edges == -1) + 1)
-    if brake[0]:
-        starts.insert(0, 0)
-    if brake[-1]:
-        ends.append(len(brake) - 1)
+    d_a = data["drivers"][0]["distance"]
     brake_shapes = [
         dict(type="rect", xref="x", yref="y domain",
-             x0=d_a[s], x1=d_a[e], y0=0, y1=1,
+             x0=start, x1=end, y0=0, y1=1,
              fillcolor="rgba(230,103,103,0.10)", line_width=0, layer="below")
-        for s, e in zip(starts, ends)
+        for start, end in data["brake_zones"]
     ]
 
     if show_delta:
-        delta = delta_time(lap_a, lap_b)
+        delta = data["delta"]
         fig.add_trace(go.Scatter(
             x=d_a, y=delta, mode="lines", name="Delta", showlegend=False,
             line=dict(color=theme.INK_SECONDARY, width=2),
@@ -135,10 +170,10 @@ def trace_panel(
     fig.update_layout(shapes=_corner_shapes(segments) + brake_shapes)
 
     # Corner numbers along the top of the speed panel.
-    for row in segments[segments["kind"] == "corner"].itertuples():
+    for row in data["corners"]:
         fig.add_annotation(
-            x=row.apex_m, y=1.0, xref="x", yref="y domain",
-            text=row.label, showarrow=False, yanchor="bottom",
+            x=row["apex_m"], y=1.0, xref="x", yref="y domain",
+            text=row["label"], showarrow=False, yanchor="bottom",
             font=dict(color=theme.INK_MUTED, size=9), row=1, col=1,
         )
 
@@ -163,6 +198,17 @@ def trace_panel(
     return fig
 
 
+def corner_delta_bars_data(comparison: pd.DataFrame, *, name_a: str, name_b: str) -> dict:
+    if comparison.empty:
+        return dict(labels=[], delta_s=[], faster=[], x_unit="segment", y_unit="s",
+                    finding="No comparable segments are available.")
+    values = comparison["delta_s"].to_numpy()
+    return dict(labels=comparison["label"].tolist(), delta_s=values,
+                faster=[name_a if v > 0 else name_b for v in values],
+                x_unit="segment", y_unit="s",
+                finding=f"{name_a} gained {values.sum():.3f} s across the segments against {name_b}.")
+
+
 def corner_delta_bars(comparison: pd.DataFrame, *, name_a: str, name_b: str,
                       height: int = 460) -> go.Figure:
     """Time gained or lost in each segment - the corner-by-corner verdict.
@@ -173,14 +219,14 @@ def corner_delta_bars(comparison: pd.DataFrame, *, name_a: str, name_b: str,
     readable alongside the traces. Bar direction carries the sign as well, so
     nothing depends on hue alone.
     """
-    df = comparison.copy()
+    data = corner_delta_bars_data(comparison, name_a=name_a, name_b=name_b)
     # delta_s > 0 means B lost time there, i.e. A was faster.
-    colours = [theme.REF_COLOUR if v > 0 else theme.CMP_COLOUR for v in df["delta_s"]]
+    colours = [theme.REF_COLOUR if v > 0 else theme.CMP_COLOUR for v in data["delta_s"]]
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=df["label"], y=df["delta_s"], marker=dict(color=colours),
-        customdata=[[name_a if v > 0 else name_b, abs(v)] for v in df["delta_s"]],
+        x=data["labels"], y=data["delta_s"], marker=dict(color=colours),
+        customdata=[[winner, abs(v)] for winner, v in zip(data["faster"], data["delta_s"])],
         hovertemplate=("<b>%{x}</b><br>%{customdata[0]} faster by "
                        "%{customdata[1]:.3f} s<extra></extra>"),
         showlegend=False,

@@ -1,18 +1,7 @@
-"""Chart endpoints: the existing ``pitwall.viz`` figures, served as JSON.
+"""Plotly figures and plain chart-data twins share one input-resolution path.
 
-Every figure in the app is built by a function that already exists and is
-already tuned - the shared ``pitwall`` Plotly template, the hovertemplates,
-the diverging colourscales, the stacked-panel layouts. None of that is
-reimplemented here. This module only resolves a chart id to its inputs, calls
-the function, and hands the resulting figure to the browser verbatim via
-``fig.to_json()``.
-
-That is what keeps the React frontend visually identical to the Streamlit one
-it replaces, and it is why the client renders with plotly.js rather than a
-charting library that would have to re-derive all of the above by hand.
-
-**The plotly.js major on the client must match the schema plotly.py emits**
-here, or traces silently fail to render. See ``frontend/package.json``.
+The existing client still uses Plotly; its major must match plotly.py until
+the SVG replacement removes that dependency (Phase 2B Steps 5-7).
 """
 
 from __future__ import annotations
@@ -20,6 +9,8 @@ from __future__ import annotations
 import math
 from typing import Any, Callable
 
+import numpy as np
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from api import cache
@@ -126,59 +117,78 @@ def _race_arc_inputs(slug: str, params: dict[str, str]):
 # Builders — one per chart id, each a thin call into pitwall.viz
 # --------------------------------------------------------------------------
 
-def _speed_delta_map(slug: str, p: dict[str, str]):
+def _speed_delta_map(slug: str, p: dict[str, str], data: bool = False):
     a, b, name_a, name_b, _ = _laps_for_comparison(slug, p)
-    return viz_trackmap.speed_delta_map(
+    render = viz_trackmap.speed_delta_map_data if data else viz_trackmap.speed_delta_map
+    return render(
         cache.load_artefact(slug, "trackmap"), a, b,
         name_a=name_a, name_b=name_b,
         corners=cache.load_artefact(slug, "corners"),
     )
 
 
-def _speed_map(slug: str, p: dict[str, str]):
+def _speed_map(slug: str, p: dict[str, str], data: bool = False):
     a, b, name_a, name_b, _ = _laps_for_comparison(slug, p)
     which = p.get("which", "a")
-    return viz_trackmap.speed_map(
+    render = viz_trackmap.speed_map_data if data else viz_trackmap.speed_map
+    return render(
         cache.load_artefact(slug, "trackmap"),
         a if which == "a" else b,
         corners=cache.load_artefact(slug, "corners"),
     )
 
 
-def _trace_panel(slug: str, p: dict[str, str]):
+def _trace_panel(slug: str, p: dict[str, str], data: bool = False):
     a, b, name_a, name_b, segments = _laps_for_comparison(slug, p)
-    return viz_traces.trace_panel(a, b, segments, name_a=name_a, name_b=name_b)
+    render = viz_traces.trace_panel_data if data else viz_traces.trace_panel
+    return render(a, b, segments, name_a=name_a, name_b=name_b)
 
 
-def _corner_delta_bars(slug: str, p: dict[str, str]):
+def _corner_delta_bars(slug: str, p: dict[str, str], data: bool = False):
     a, b, name_a, name_b, segments = _laps_for_comparison(slug, p)
     comparison = compare_corners(a, b, segments, name_a=name_a, name_b=name_b)
-    return viz_traces.corner_delta_bars(comparison, name_a=name_a, name_b=name_b)
+    render = viz_traces.corner_delta_bars_data if data else viz_traces.corner_delta_bars
+    result = render(comparison, name_a=name_a, name_b=name_b)
+    if data and not comparison.empty:
+        corners = comparison.loc[comparison["kind"] == "corner", "delta_s"]
+        names = cache.load_artefact(slug, "results")
+        full_name = name_a
+        if {"Abbreviation", "FullName"}.issubset(names.columns):
+            match = names.loc[names["Abbreviation"] == name_a, "FullName"]
+            if not match.empty:
+                full_name = str(match.iloc[0]).split()[-1]
+        result["finding"] = (f"{full_name} gained {corners.sum():.3f} s in the corners "
+                             f"against {name_b}.")
+    return result
 
 
-def _lap_by_lap(slug: str, p: dict[str, str]):
+def _lap_by_lap(slug: str, p: dict[str, str], data: bool = False):
     driver_a, driver_b = p.get("driver1"), p.get("driver2")
     if not driver_a or not driver_b:
         raise HTTPException(400, "driver1 and driver2 are required")
     h2h = head_to_head(cache.load_laps(slug), driver_a, driver_b)
     if h2h.empty:
         raise HTTPException(404, "No lap table stored for this session")
-    return viz_charts.lap_by_lap(h2h, name_a=driver_a, name_b=driver_b)
+    render = viz_charts.lap_by_lap_data if data else viz_charts.lap_by_lap
+    return render(h2h, name_a=driver_a, name_b=driver_b)
 
 
-def _degradation_scatter(slug: str, p: dict[str, str]):
+def _degradation_scatter(slug: str, p: dict[str, str], data: bool = False):
     prepared, stints, _, *_ = _race_arc_inputs(slug, p)
-    return viz_charts.degradation_scatter(prepared, stints)
+    render = viz_charts.degradation_scatter_data if data else viz_charts.degradation_scatter
+    return render(prepared, stints)
 
 
-def _degradation_bars(slug: str, p: dict[str, str]):
+def _degradation_bars(slug: str, p: dict[str, str], data: bool = False):
     _, _, summary, *_ = _race_arc_inputs(slug, p)
-    return viz_charts.degradation_bars(summary)
+    render = viz_charts.degradation_bars_data if data else viz_charts.degradation_bars
+    return render(summary)
 
 
-def _session_best(slug: str, p: dict[str, str]):
+def _session_best(slug: str, p: dict[str, str], data: bool = False):
     progression = evolution.session_best_progression(cache.load_laps(slug))
-    return viz_charts.session_best_curve(progression)
+    render = viz_charts.session_best_curve_data if data else viz_charts.session_best_curve
+    return render(progression)
 
 
 def _evolution_pair(slug: str, p: dict[str, str]):
@@ -190,56 +200,67 @@ def _evolution_pair(slug: str, p: dict[str, str]):
     return result["curve"], naive
 
 
-def _evolution_curve(slug: str, p: dict[str, str]):
+def _evolution_curve(slug: str, p: dict[str, str], data: bool = False):
     curve, naive = _evolution_pair(slug, p)
-    return viz_charts.evolution_curve(curve, naive)
+    render = viz_charts.evolution_curve_data if data else viz_charts.evolution_curve
+    return render(curve, naive)
 
 
-def _evolution_temperature(slug: str, p: dict[str, str]):
+def _evolution_temperature(slug: str, p: dict[str, str], data: bool = False):
     curve, _ = _evolution_pair(slug, p)
-    return viz_charts.evolution_with_temperature(
+    render = (viz_charts.evolution_with_temperature_data if data
+              else viz_charts.evolution_with_temperature)
+    return render(
         curve, cache.load_artefact(slug, "weather"))
 
 
-def _stint_chart(slug: str, p: dict[str, str]):
-    return viz_charts.stint_chart(strategy.stint_table(cache.load_laps(slug)))
+def _stint_chart(slug: str, p: dict[str, str], data: bool = False):
+    render = viz_charts.stint_chart_data if data else viz_charts.stint_chart
+    return render(strategy.stint_table(cache.load_laps(slug)))
 
 
-def _race_pace_box(slug: str, p: dict[str, str]):
+def _race_pace_box(slug: str, p: dict[str, str], data: bool = False):
     prepared, *_ = _race_arc_inputs(slug, p)
+    if data:
+        return viz_charts.race_pace_box_data(prepared, strategy.race_pace(prepared))
     return viz_charts.race_pace_box(
         prepared, strategy.race_pace(prepared),
         results=cache.load_artefact(slug, "results"),
     )
 
 
-def _gap_chart(slug: str, p: dict[str, str]):
+def _gap_chart(slug: str, p: dict[str, str], data: bool = False):
     chosen = [d for d in (p.get("drivers") or "").split(",") if d]
+    if data:
+        return viz_charts.gap_chart_data(strategy.gap_evolution(cache.load_laps(slug)), chosen)
     return viz_charts.gap_chart(
         strategy.gap_evolution(cache.load_laps(slug)), chosen,
         results=cache.load_artefact(slug, "results"),
     )
 
 
-def _position_chart(slug: str, p: dict[str, str]):
+def _position_chart(slug: str, p: dict[str, str], data: bool = False):
+    if data:
+        return viz_charts.position_chart_data(cache.load_laps(slug))
     return viz_charts.position_chart(
         cache.load_laps(slug), results=cache.load_artefact(slug, "results"))
 
 
-def _undercut_chart(slug: str, p: dict[str, str]):
+def _undercut_chart(slug: str, p: dict[str, str], data: bool = False):
     gap_s = _number(p, "gap_s", 1.5)
     table = strategy.undercut_gain(
         gap_to_rival_s=gap_s,
         fresh_tyre_advantage_s=_number(p, "advantage", 0.8),
         deg_s_per_lap=_number(p, "deg_rate", 0.10),
     )
-    return viz_charts.undercut_chart(table, gap_s)
+    render = viz_charts.undercut_chart_data if data else viz_charts.undercut_chart
+    return render(table, gap_s)
 
 
 # ``slug`` is unused by the undercut chart - it is a pure function of its three
 # slider values - but the signature is uniform so the registry stays a plain
 # lookup rather than a set of special cases.
-BUILDERS: dict[str, Callable[[str, dict[str, str]], Any]] = {
+BUILDERS: dict[str, Callable[..., Any]] = {
     # Corner Analysis
     "speed-delta-map": _speed_delta_map,
     "speed-map": _speed_map,
@@ -265,16 +286,7 @@ BUILDERS: dict[str, Callable[[str, dict[str, str]], Any]] = {
 _SLUGLESS = {"undercut-chart"}
 
 
-@router.get("/api/chart/{chart_id}")
-def get_chart(chart_id: str, request: Request,
-              slug: str = Query("", description="e.g. 2024/12_Q")):
-    """A tuned ``pitwall.viz`` figure, as Plotly JSON.
-
-    Returned as a raw ``Response`` rather than a dict: ``fig.to_json()``
-    already produces valid, NaN-free JSON via Plotly's own encoder, and
-    round-tripping it through FastAPI's serialiser would only risk mangling
-    the numpy arrays it has just encoded correctly.
-    """
+def _validated_builder(chart_id: str, slug: str) -> Callable[..., Any]:
     builder = BUILDERS.get(chart_id)
     if builder is None:
         raise HTTPException(404, f"Unknown chart: {chart_id!r}")
@@ -289,6 +301,38 @@ def get_chart(chart_id: str, request: Request,
         manifest = cache.load_manifest()
         if manifest.empty or slug not in set(manifest["slug"].astype(str)):
             raise HTTPException(404, f"Session {slug} is not in the manifest")
+    return builder
+
+
+def _plain(value: Any) -> Any:
+    if isinstance(value, np.ndarray):
+        return [_plain(item) for item in value]
+    if isinstance(value, np.generic):
+        return _plain(value.item())
+    if isinstance(value, dict):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    if value is pd.NA or value is pd.NaT:
+        return None
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    return value
+
+
+@router.get("/api/chart/{chart_id}")
+def get_chart(chart_id: str, request: Request,
+              slug: str = Query("", description="e.g. 2024/12_Q")):
+    """A tuned ``pitwall.viz`` figure, as Plotly JSON."""
+    builder = _validated_builder(chart_id, slug)
 
     figure = builder(slug, dict(request.query_params))
     return Response(content=figure.to_json(), media_type="application/json")
+
+
+@router.get("/api/chart-data/{chart_id}")
+def get_chart_data(chart_id: str, request: Request,
+                   slug: str = Query("", description="e.g. 2024/12_Q")):
+    builder = _validated_builder(chart_id, slug)
+    return _plain(dict(chart_id=chart_id,
+                       **builder(slug, dict(request.query_params), data=True)))
