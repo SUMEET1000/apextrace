@@ -12,11 +12,12 @@ import { useMetaTags } from '../../hooks/useMetaTags';
 import type { ManifestSession, Outline } from '../../lib/types';
 
 export function SessionHeader(
-  { meta, sessionLabel, pageTitle, track }: {
+  { meta, sessionLabel, pageTitle, track, showCorners = false }: {
     meta: ManifestSession;
     sessionLabel: string;
     pageTitle: string;
     track?: Outline;
+    showCorners?: boolean;
   },
 ) {
   useMetaTags(
@@ -37,7 +38,8 @@ export function SessionHeader(
           <div className="pw-hero-sub">{meta.location}, {meta.country}</div>
         </div>
         <div className="pw-hero-art">
-          <CircuitSvg track={track} width={190} height={120} />
+          <CircuitSvg track={track} width={showCorners ? 320 : 190}
+            height={showCorners ? 220 : 120} showCorners={showCorners} />
         </div>
       </div>
       <CopyLink />

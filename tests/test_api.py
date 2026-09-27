@@ -130,6 +130,8 @@ def test_session_detail(any_slug):
     assert body["session_label"]
     assert isinstance(body["is_race"], bool)
     assert len(body["trackmap"]["x"]) == len(body["trackmap"]["y"])
+    corners = body["trackmap"]["corners"]
+    assert len(corners["x"]) == len(corners["y"]) == len(corners["labels"])
     assert set(body["availability"]["summary"]) >= {
         "n_laps", "n_stored", "n_missing", "coverage", "stores_all_laps"}
 

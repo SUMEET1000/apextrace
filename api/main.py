@@ -36,6 +36,7 @@ from pitwall.corners import (  # noqa: E402
 )
 from pitwall.strategy import head_to_head  # noqa: E402
 from pitwall.viz import theme  # noqa: E402
+from pitwall.viz.trackmap import corner_labels_data  # noqa: E402
 
 app = FastAPI(
     title="ApexTrace API",
@@ -328,7 +329,8 @@ def get_session(slug: str = Query(..., description="e.g. 2024/12_Q")):
         "has_telemetry": not telemetry.empty,
         "drivers": drivers,
         "driver_laps": driver_laps,
-        "trackmap": _trackmap_xy(slug),
+        "trackmap": {**_trackmap_xy(slug),
+                     "corners": jsonable(corner_labels_data(cache.load_artefact(slug, "corners")))},
         "results": records(results),
         "availability": {"summary": jsonable(summary), "reasons": records(reasons)},
     }

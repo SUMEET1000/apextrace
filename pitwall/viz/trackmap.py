@@ -141,7 +141,7 @@ def _start_finish(fig: go.Figure, x: np.ndarray, y: np.ndarray) -> None:
     )
 
 
-def _corner_labels_data(corners: pd.DataFrame | None) -> dict:
+def corner_labels_data(corners: pd.DataFrame | None) -> dict:
     if corners is None or corners.empty or not {"X", "Y"}.issubset(corners.columns):
         return dict(x=[], y=[], labels=[])
     rotation = float(corners["Rotation"].iloc[0]) if "Rotation" in corners else 0.0
@@ -194,7 +194,7 @@ def speed_delta_map_data(track: pd.DataFrame, lap_a: pd.DataFrame,
                          corners: pd.DataFrame | None = None) -> dict:
     if track.empty:
         return dict(x=[], y=[], rate=[], delta_s=[], distance_m=[], readable=[],
-                    limit=1e-6, sectors=[], corners=_corner_labels_data(corners),
+                    limit=1e-6, sectors=[], corners=corner_labels_data(corners),
                     x_unit="position units", y_unit="position units", colour_unit="s per sample",
                     finding="No circuit map is available.")
     n = min(len(track), len(lap_a), len(lap_b))
@@ -212,7 +212,7 @@ def speed_delta_map_data(track: pd.DataFrame, lap_a: pd.DataFrame,
                 distance_m=distance,
                 readable=readable, limit=limit,
                 sectors=_ribbon_data(x, y, rate, theme.DIVERGING, -limit, limit),
-                corners=_corner_labels_data(corners),
+                corners=corner_labels_data(corners),
                 x_unit="position units", y_unit="position units",
                 colour_unit="s per sample",
                 finding=(f"The largest local gap change between {name_a} and {name_b} "
@@ -289,7 +289,7 @@ def speed_map_data(track: pd.DataFrame, lap: pd.DataFrame, *,
                    corners: pd.DataFrame | None = None) -> dict:
     if track.empty:
         return dict(x=[], y=[], speed=[], known=[], lo=0.0, hi=0.0,
-                    sectors=[], corners=_corner_labels_data(corners),
+                    sectors=[], corners=corner_labels_data(corners),
                     x_unit="position units", y_unit="position units", colour_unit="km/h",
                     finding="No circuit map is available.")
     n = min(len(track), len(lap))
@@ -300,7 +300,7 @@ def speed_map_data(track: pd.DataFrame, lap: pd.DataFrame, *,
     scale = [[0.0, "#cde2fb"], [0.5, "#3987e5"], [1.0, "#0d366b"]]
     return dict(x=x, y=y, speed=speed, known=known, lo=lo, hi=hi,
                 sectors=_ribbon_data(x, y, speed, scale, lo, hi),
-                corners=_corner_labels_data(corners),
+                corners=corner_labels_data(corners),
                 x_unit="position units", y_unit="position units",
                 colour_unit="km/h",
                 finding=(f"Speed ranges from {lo:.0f} to {hi:.0f} km/h on this lap."

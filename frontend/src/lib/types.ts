@@ -51,6 +51,7 @@ export interface ThemeResponse {
 export interface Outline {
   x: number[];
   y: number[];
+  corners?: { x: number[]; y: number[]; labels: string[] };
 }
 
 export interface Circuit extends Outline {

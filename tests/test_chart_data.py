@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from api.charts import BUILDERS, _plain
 from api.main import app
-from pitwall.viz.charts import box_statistics
+from pitwall.viz.charts import box_statistics, lap_by_lap_data
 from pitwall.viz.traces import trace_panel_data
 
 client = TestClient(app)
@@ -200,6 +200,23 @@ def test_fixed_findings():
     assert q.status_code == r.status_code == 200
     assert q.json()["finding"] == "Russell gained 0.326 s in the corners against VER."
     assert r.json()["finding"] == "SOFT tyres lose 0.116 s per lap on average."
+
+
+def test_qualifying_lap_finding_uses_comparable_pairs():
+    response = client.get("/api/chart-data/lap-by-lap", params={"slug": Q, **DRIVERS})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["finding"] == (
+        f"{len(data['delta']['lap'])} comparable lap time pairs are available for RUS and VER.")
+    assert "nan" not in data["finding"].lower()
+
+
+def test_running_gap_finding_does_not_claim_a_race_finish():
+    rows = pd.DataFrame({"LapNumber": [1, 2, 3], "LapTime_s_a": [90, 90, np.nan],
+                         "LapTime_s_b": [91, 88, 89], "delta_s": [1, -2, np.nan],
+                         "cumulative_s": [1, -1, np.nan]})
+    assert lap_by_lap_data(rows, name_a="A", name_b="B")["finding"] == (
+        "Through lap 2, B was 1.000 s ahead of A on summed lap times.")
 
 
 def test_qualifying_without_degradation_summary_returns_empty_data():

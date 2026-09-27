@@ -16,10 +16,70 @@ export interface Projected {
   y: number[];
 }
 
+export interface CornerMark { x: number; y: number; label: string }
+
+/** Keep numbered boxes clear of the racing line, with leaders to the measured turn. */
+export function placeCornerMarks(track: Projected, corners: CornerMark[], width: number,
+                                 height: number, size: number): CornerMark[] {
+  const placed: CornerMark[] = [];
+  const directions = [[0, -1], [1, 0], [0, 1], [-1, 0],
+    [1, -1], [1, 1], [-1, 1], [-1, -1]];
+  for (const corner of corners) {
+    let best = { x: corner.x, y: corner.y, label: corner.label };
+    let bestScore = Infinity;
+    for (const radius of [size * 1.5, size * 2.2, size * 3]) {
+      for (const [dx, dy] of directions) {
+        const x = corner.x + dx * radius;
+        const y = corner.y + dy * radius;
+        if (x < size / 2 + 3 || x > width - size / 2 - 3
+          || y < size / 2 + 3 || y > height - size / 2 - 3) continue;
+        let score = radius;
+        for (let i = 0; i < track.x.length; i++) {
+          const outsideX = Math.max(0, Math.abs(track.x[i] - x) - size / 2);
+          const outsideY = Math.max(0, Math.abs(track.y[i] - y) - size / 2);
+          const clearance = Math.hypot(outsideX, outsideY);
+          if (clearance < 7) score += (7 - clearance) * 150;
+        }
+        for (const other of placed) {
+          const overlapX = size + 5 - Math.abs(other.x - x);
+          const overlapY = size + 5 - Math.abs(other.y - y);
+          if (overlapX > 0 && overlapY > 0) score += 3000 + overlapX * overlapY;
+        }
+        if (score < bestScore) { bestScore = score; best = { x, y, label: corner.label }; }
+      }
+    }
+    placed.push(best);
+  }
+  return placed;
+}
+
 const PAD = 10;
 
 function ptp(values: number[]): number {
   return Math.max(...values) - Math.min(...values);
+}
+
+function fit(track: Outline, width: number, height: number) {
+  const spanX = ptp(track.x) || 1;
+  const spanY = ptp(track.y) || 1;
+  const scale = Math.min((width - 2 * PAD) / spanX, (height - 2 * PAD) / spanY);
+  const minX = Math.min(...track.x);
+  const minY = Math.min(...track.y);
+  const offsetX = (width - (spanX * scale + 2 * PAD)) / 2;
+  return (x: number, y: number): [number, number] => [
+    (x - minX) * scale + PAD + offsetX,
+    (height - PAD) - (y - minY) * scale,
+  ];
+}
+
+export function projectCornerMarks(track: Outline, width: number, height: number,
+                                   corners: { x: number[]; y: number[]; labels: string[] }): CornerMark[] {
+  if (track.x.length < 3 || track.x.length !== track.y.length) return [];
+  const at = fit(track, width, height);
+  return corners.x.map((x, i) => {
+    const [px, py] = at(x, corners.y[i]);
+    return { x: px, y: py, label: corners.labels[i] };
+  });
 }
 
 /** Decimated screen-space points for a trackmap, or null if unusable. */
@@ -32,12 +92,7 @@ export function project(
   const { x, y } = track;
 
   // Fit into the viewbox, preserving aspect and flipping Y for screen space.
-  const spanX = ptp(x) || 1;
-  const spanY = ptp(y) || 1;
-  const scale = Math.min((width - 2 * PAD) / spanX, (height - 2 * PAD) / spanY);
-  const minX = Math.min(...x);
-  const minY = Math.min(...y);
-  const offsetX = (width - (spanX * scale + 2 * PAD)) / 2;
+  const at = fit(track, width, height);
 
   const px: number[] = [];
   const py: number[] = [];
@@ -45,8 +100,9 @@ export function project(
   // `len // 260`, so a 1000-point grid becomes ~334 points.
   const step = Math.max(1, Math.floor(x.length / 260));
   for (let i = 0; i < x.length; i += step) {
-    px.push((x[i] - minX) * scale + PAD + offsetX);
-    py.push((height - PAD) - (y[i] - minY) * scale);
+    const [pointX, pointY] = at(x[i], y[i]);
+    px.push(pointX);
+    py.push(pointY);
   }
   return { x: px, y: py };
 }

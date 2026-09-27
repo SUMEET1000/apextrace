@@ -15,7 +15,7 @@ import { useReveal } from './hooks/useReveal';
 import { fetchManifest, fetchOpener, useAsync } from './lib/api';
 import { Landing } from './landing/Landing';
 import { useLocation } from './lib/router';
-const CornerAnalysisPage = lazy(() => import('./pages/CornerAnalysis').then(({ CornerAnalysisPage }) => ({ default: CornerAnalysisPage })));
+const CornerPage = lazy(() => import('./pages/corner/CornerPage').then(({ CornerPage }) => ({ default: CornerPage })));
 const RaceArcPage = lazy(() => import('./pages/RaceArc').then(({ RaceArcPage }) => ({ default: RaceArcPage })));
 
 /** Which session type each route wants to open on when the URL says nothing. */
@@ -37,7 +37,7 @@ export function App() {
   );
 }
 
-/** Corner Analysis and Race Arc, the pre-2B pages, until Steps 5 and 6 replace them. */
+/** The analysis routes share session discovery; Race Arc keeps its legacy page until Step 6. */
 function Analysis({ pathname, search }: { pathname: string; search: string }) {
   const [selection, setSelection] = useState<Selection | null>(null);
   // Open on a desktop, closed on a phone — below 900px the rail is an overlay
@@ -73,11 +73,15 @@ function Analysis({ pathname, search }: { pathname: string; search: string }) {
     return <Empty>No sessions have been built yet, so there is nothing to analyse.</Empty>;
   }
 
+  if (pathname === '/corner-analysis') {
+    return <div className="pw-main"><Suspense fallback={<Loading what="the charts" />}>
+      <CornerPage sessions={sessions} years={years} openerSlug={opener.data?.slug} />
+    </Suspense></div>;
+  }
+
   let page = null;
   if (selection) {
-    page = pathname === '/corner-analysis'
-      ? <CornerAnalysisPage selection={selection} />
-      : <RaceArcPage selection={selection} />;
+    page = <RaceArcPage selection={selection} />;
   }
 
   return (

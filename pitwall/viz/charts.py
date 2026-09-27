@@ -585,14 +585,18 @@ def lap_by_lap_data(h2h: pd.DataFrame, *, name_a: str, name_b: str) -> dict:
                               pit_lap=pits["LapNumber"].to_numpy(),
                               pit_time_s=pits[col].to_numpy()))
     delta = h2h.dropna(subset=["delta_s"])
+    finite_gap = h2h[np.isfinite(pd.to_numeric(h2h["cumulative_s"], errors="coerce"))] if not h2h.empty else h2h
+    last_gap = float(finite_gap.iloc[-1]["cumulative_s"]) if not finite_gap.empty else 0.0
     return dict(lap_times=lap_times, delta=dict(lap=delta["LapNumber"].to_numpy(),
                                                seconds=delta["delta_s"].to_numpy()),
                 cumulative=dict(lap=h2h["LapNumber"].to_numpy(),
                                 seconds=h2h["cumulative_s"].to_numpy()),
                 x_unit="lap", y_unit="s",
-                finding=(f"{name_b} finished {h2h['cumulative_s'].iloc[-1]:+.3f} s "
-                         f"relative to {name_a} across the recorded laps."
-                         if not h2h.empty else "No head-to-head lap times are available."))
+                finding=(f"Through lap {int(finite_gap.iloc[-1]['LapNumber'])}, {name_b} was "
+                         f"{abs(last_gap):.3f} s {'ahead of' if last_gap < 0 else 'behind' if last_gap > 0 else 'level with'} "
+                         f"{name_a} on summed lap times."
+                         if not finite_gap.empty else
+                         f"{len(delta)} comparable lap time pairs are available for {name_a} and {name_b}."))
 
 
 def lap_by_lap(h2h: pd.DataFrame, *, name_a: str, name_b: str,

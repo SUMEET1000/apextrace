@@ -80,7 +80,7 @@ export function RaceArcPage({ selection }: { selection: Selection }) {
     <Section>
       <SessionHeader
         meta={meta} sessionLabel={session.data.session_label}
-        pageTitle="Race Arc & Strategy" track={session.data.trackmap}
+        pageTitle="Race Arc & Strategy" track={session.data.trackmap} showCorners
       />
     </Section>
   );

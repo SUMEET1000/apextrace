@@ -85,6 +85,14 @@ export function chartUrl(
   return `${API_BASE}/chart/${id}${query(params)}`;
 }
 
+export function fetchChartData<T>(
+  id: string,
+  params: Record<string, string | number | null | undefined>,
+  signal?: AbortSignal,
+): Promise<T> {
+  return get<T>(`/chart-data/${id}${query(params)}`, signal);
+}
+
 // --------------------------------------------------------------------------
 // The one data hook
 // --------------------------------------------------------------------------

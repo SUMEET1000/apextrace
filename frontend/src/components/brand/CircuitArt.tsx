@@ -12,7 +12,8 @@
 import {
   useCallback, useEffect, useId, useRef, useState, type CSSProperties,
 } from 'react';
-import { closedPath, interp, polylinePoints, project } from '../../lib/circuit';
+import { closedPath, interp, polylinePoints, project, projectCornerMarks } from '../../lib/circuit';
+import { CornerLabels } from '../charts/CornerCharts';
 import type { Circuit, Outline } from '../../lib/types';
 import { useTheme } from '../../lib/theme';
 import { Select } from '../ui/primitives';
@@ -22,9 +23,9 @@ import { Select } from '../ui/primitives';
 // --------------------------------------------------------------------------
 
 export function CircuitSvg(
-  { track, width = 300, height = 190, stroke, glow = true }: {
+  { track, width = 300, height = 190, stroke, glow = true, showCorners = false }: {
     track: Outline | undefined;
-    width?: number; height?: number; stroke?: string; glow?: boolean;
+    width?: number; height?: number; stroke?: string; glow?: boolean; showCorners?: boolean;
   },
 ) {
   const theme = useTheme();
@@ -51,6 +52,10 @@ export function CircuitSvg(
         strokeLinejoin="round" strokeLinecap="round"
         filter={glow ? `url(#${filterId})` : undefined}
       />
+      {showCorners && track?.corners && <CornerLabels
+        track={project(track, width, height)!}
+        corners={projectCornerMarks(track, width, height, track.corners)}
+        width={width} height={height} size={14} />}
     </svg>
   );
 }
