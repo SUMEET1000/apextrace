@@ -120,8 +120,8 @@ body{font-size:16px}.lab{font-size:13px}header nav{gap:26px}.btn{font-size:14px}
 .sp p{font-size:16px}.prog u b{font-size:12px}
 .panel .foot p{font-size:16px;line-height:1.5}.panel .foot strong{font:400 20px/1.15 var(--fd);text-transform:uppercase;display:block;margin-bottom:6px}
 .strip{display:flex;justify-content:space-between;gap:12px}.strip span{padding:8px 12px}
-/* Unlit gap rows stay readable (about 3:1 on paper) so the scroll reveal no longer hides the numbers. */
-.count li{opacity:.45}
+/* Unlit gap rows stay readable (meets 4.5:1 WCAG AA on paper) so the scroll reveal passes contrast. */
+.count li{opacity:.68}
 /* Phone: the section links move to a bar along the bottom edge instead of disappearing. */
 @media(max-width:860px){header nav{display:flex;position:fixed;left:0;right:0;bottom:0;height:52px;justify-content:space-around;align-items:center;gap:0;background:var(--paper);border-top:var(--bw) solid var(--ink);z-index:41}
   header nav a{padding:14px 8px}body{padding-bottom:52px}}
