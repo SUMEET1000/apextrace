@@ -7,16 +7,17 @@
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import Lenis from 'lenis';
-import { lifting, lifted } from './loader';
+import { lifting } from './loader';
 
 gsap.registerPlugin(ScrollTrigger);
 
 const NS = 'http://www.w3.org/2000/svg';
 export const el = (n, a = {}) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); return e; };
 
-export function boot(root, F) {
+export function boot(root, F, onHeroEntered) {
   const D = document, undo = [];
   let alive = true;
+  let startTerrain = () => {};
   const on = (t, type, fn, o) => { t.addEventListener(type, fn, o); undo.push(() => t.removeEventListener(type, fn, o)); };
   const later = (fn, ms) => { const id = setTimeout(fn, ms); undo.push(() => clearTimeout(id)); };
   // Restores a node's children on cleanup, for the spots this code rewrites.
@@ -243,7 +244,7 @@ export function boot(root, F) {
     ctx.add(() => {
       // Opening: the hero enters while the loader is half lifted. A 0.7 s expo.out read as instant;
       // 1 s power3.out still reads as a rise.
-      const hero = gsap.timeline({ paused: true }).from(['.hero .photo', '.panel', '.stage', ...root.querySelectorAll('.hero .ann')].map(s => typeof s === 'string' ? root.querySelector(s) : s),
+      const hero = gsap.timeline({ paused: true, onComplete: () => { if (alive) { startTerrain(); onHeroEntered(); } } }).from(['.hero .photo', '.panel', '.stage', ...root.querySelectorAll('.hero .ann')].map(s => typeof s === 'string' ? root.querySelector(s) : s),
         { ...FROM.rise(DIST), duration: 1, ease: 'power3.out', stagger: .1 });
       lifting.then(at => { if (alive) later(() => hero.play(), Math.max(0, at + 450 - performance.now())); });
 
@@ -405,7 +406,7 @@ export function boot(root, F) {
     const stage = root.querySelector('.hero .stage'), svg = D.getElementById('trk'), c = D.createElement('canvas'); c.className = 'terr'; stage.prepend(c);
     undo.push(() => c.remove());
     const x = c.getContext('2d'), still = off;
-    let w, h, sc = .7, G, r, cols, rows, cov, B = [], RIP = [], last = 0, run = false, vis = true, px = -1e4, py = -1e4, mx = -1e4, my = -1e4;
+    let w, h, sc = .7, G, r, cols, rows, cov, B = [], RIP = [], last = 0, run = false, ready = false, vis = true, px = -1e4, py = -1e4, mx = -1e4, my = -1e4;
     const rnd = (a, b) => a + Math.random() * (b - a);
     function size() {
       const q = c.getBoundingClientRect(), d = devicePixelRatio || 1, vb = svg.viewBox.baseVal;
@@ -445,12 +446,13 @@ export function boot(root, F) {
       x.fill();
     }
     function loop(t) { if (!alive) { run = false; return; } draw(still ? 0 : t); if (vis && !still) requestAnimationFrame(loop); else run = false; }
-    function kick() { if (!run && vis && alive) { run = true; requestAnimationFrame(loop); } }
+    function kick() { if (ready && !run && vis && alive) { run = true; requestAnimationFrame(loop); } }
     on(window, 'pointermove', e => { const q = c.getBoundingClientRect(), t = performance.now(); px = e.clientX - q.left; py = e.clientY - q.top;
       if (t - last > 90) { RIP.push({ x: px, y: py, t }); last = t; if (RIP.length > 14) RIP.shift(); } }, { passive: true });
     on(window, 'resize', () => { size(); kick(); });
     const io = new IntersectionObserver(es => { vis = es[0].isIntersecting; kick(); }); io.observe(stage); undo.push(() => io.disconnect());
-    size(); kick();
+    size(); draw(0);
+    startTerrain = () => { ready = true; kick(); };
   })();
 
   return () => {

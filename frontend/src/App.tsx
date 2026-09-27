@@ -6,7 +6,7 @@
  * two analysis routes only.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { Footer, Header } from './components/Shell';
 import { Sidebar, SidebarSlot } from './components/Sidebar';
 import { SessionPicker, type Selection } from './components/SessionPicker';
@@ -15,8 +15,8 @@ import { useReveal } from './hooks/useReveal';
 import { fetchManifest, fetchOpener, useAsync } from './lib/api';
 import { Landing } from './landing/Landing';
 import { useLocation } from './lib/router';
-import { CornerAnalysisPage } from './pages/CornerAnalysis';
-import { RaceArcPage } from './pages/RaceArc';
+const CornerAnalysisPage = lazy(() => import('./pages/CornerAnalysis').then(({ CornerAnalysisPage }) => ({ default: CornerAnalysisPage })));
+const RaceArcPage = lazy(() => import('./pages/RaceArc').then(({ RaceArcPage }) => ({ default: RaceArcPage })));
 
 /** Which session type each route wants to open on when the URL says nothing. */
 const PREFERRED: Record<string, string[]> = {
@@ -97,7 +97,7 @@ function Analysis({ pathname, search }: { pathname: string; search: string }) {
 
           <div className="pw-content">
             <div className="pw-block-container">
-              <div className="pw-main" ref={main}>{page}</div>
+              <div className="pw-main" ref={main}><Suspense fallback={<Loading what="the charts" />}>{page}</Suspense></div>
             </div>
           </div>
         </div>

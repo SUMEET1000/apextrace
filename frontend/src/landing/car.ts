@@ -23,7 +23,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 
 const D = document, DEG = Math.PI / 180, TILT = 74 * DEG, LEN = 5.45;
 
-export function startCar(host, introAt) {
+export function startCar(host) {
   const cv = D.createElement('canvas'); cv.id = 'car'; cv.setAttribute("aria-hidden", "true"); host.append(cv);
   const undo = [], on = (t, type, fn, o) => { t.addEventListener(type, fn, o); undo.push(() => t.removeEventListener(type, fn, o)); };
   const ctx = gsap.context(() => {});
@@ -257,6 +257,7 @@ export function startCar(host, introAt) {
     return { x, y, h: mix(Math.atan2(dy, dx) / DEG, 180, w), v: w, L: lapL() + (P.L - lapL()) * w };
   };
 
+  const introAt = performance.now();
   const keys = [
     { s: () => 0, at: introAt, timed: { dur: 1800, fn: t => { const [x, y] = heroPos(), L = heroL(), e = 1 - (1 - t) ** 3; return { x: innerWidth + L - (innerWidth + L - x) * e, y, h: 180, v: .3 + .7 * Math.max(0, (t - .55) / .45), L }; } } },
     ...lis.flatMap((_, i) => [{ s: rowS(i, 0), pos: rowPos(i), h: 90, L: gapL, lin: true }, { s: i === lis.length - 1 ? () => pin().end : rowS(i, .6), pos: rowPos(i), h: 90, L: gapL }]),

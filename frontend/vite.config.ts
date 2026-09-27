@@ -22,17 +22,6 @@ export default defineConfig({
     },
   },
   build: {
-    // plotly.js is ~4.8 MB unminified and dwarfs everything else. Splitting it
-    // out keeps the app chunk small enough to re-download on every deploy
-    // while the chart engine stays in cache.
-    rollupOptions: {
-      output: {
-        manualChunks: (id) =>
-          (id.includes('plotly.js') || id.includes('react-plotly.js'))
-            ? 'plotly'
-            : undefined,
-      },
-    },
     chunkSizeWarningLimit: 5000,
   },
 });

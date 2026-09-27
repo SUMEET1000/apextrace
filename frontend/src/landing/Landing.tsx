@@ -12,7 +12,7 @@ import { Term } from '../components/Term';
 import { Link } from '../lib/router';
 import { boot } from './boot';
 import F from './facts.json';
-import { HERO_IMAGE, lifted } from './loader';
+import { HERO_IMAGE } from './loader';
 import './landing.css';
 
 const s3 = (v: number) => v.toFixed(3);
@@ -70,13 +70,12 @@ export function Landing() {
 
   useEffect(() => {
     const node = root.current!;
-    const stop = boot(node, F);
     let stopCar: (() => void) | null = null, gone = false;
-    if (innerWidth >= 860 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      Promise.all([import('./car'), lifted]).then(([car, at]) => {
-        if (!gone) stopCar = car.startCar(node, at);
-      });
-    }
+    const stop = boot(node, F, () => {
+      if (innerWidth >= 860 && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        import('./car').then((car) => { if (!gone) stopCar = car.startCar(node); });
+      }
+    });
     return () => { gone = true; stopCar?.(); stop(); };
   }, []);
 
@@ -108,7 +107,7 @@ export function Landing() {
         <div>
           <span className="lab">THE ANSWER · {AU} WAS {GAP} S FASTER THAN {BU} · SCROLL TO ADD IT UP</span>
           <div className="big"><span id="sum">0.000</span><small> S</small></div>
-          <p style={{ maxWidth: '46ch', marginTop: 14 }}><Term id="pole" /> <Term id="qualifying" /> At {F.source.location} {F.source.year} {A}{ON_POLE ? ' took pole' : ' set the faster lap'}. {B} qualified {ordinal(F.lap.b.position)}, {GAP} s slower, and the total above adds that gap up one piece at a time. {B} was faster in {F.faster.b} of the {CORNERS} corners, most of all at {TOP.slice(0, -1).join(', ')} and {TOP[TOP.length - 1]}. It was not enough.</p>
+          <p style={{ marginTop: 14 }}><Term id="pole" /> <Term id="qualifying" /> At {F.source.location} {F.source.year} {A}{ON_POLE ? ' took pole' : ' set the faster lap'}. {B} qualified {ordinal(F.lap.b.position)}, {GAP} s slower, and the total above adds that gap up one piece at a time. {B} was faster in {F.faster.b} of the {CORNERS} corners, most of all at {TOP.slice(0, -1).join(', ')} and {TOP[TOP.length - 1]}. It was not enough.</p>
           <p className="lab" style={{ marginTop: 14, textTransform: 'none', letterSpacing: 0 }}>+ = time {A} gained · − = time {B} gained · rows rounded to 0.001 s; the total uses unrounded values.</p>
         </div>
         <ol id="parts">{F.count_bars.map(barRow)}</ol>

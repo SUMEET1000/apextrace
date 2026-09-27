@@ -4,8 +4,7 @@
  * On `/` it holds even on cached visits; it never waits on the API.
  * Anywhere else, and with reduced motion, it goes at once.
  * `lifting` resolves when it starts to slide up (the hero enters
- * 450 ms later, as in 08) and `lifted` when it is removed (the guide car drives
- * in then).
+ * 450 ms later, as in 08). The guide car starts after the hero entrance.
  */
 
 export const HERO_IMAGE = '/img/sensor.png';
@@ -17,21 +16,17 @@ declare global {
     __loaderLifting?: number;
     __loaderLifted?: number;
     __onLoaderLifting?: (at: number) => void;
-    __onLoaderLifted?: (at: number) => void;
   }
 }
 
 let resolveLifting: (at: number) => void;
-let resolveLifted: (at: number) => void;
 export const lifting = new Promise<number>((resolve) => { resolveLifting = resolve; });
-export const lifted = new Promise<number>((resolve) => { resolveLifted = resolve; });
 
 export function startLoader(): void {
   const loader = document.getElementById('loader');
   const done = (at = performance.now()) => {
     loader?.remove();
     resolveLifting(at);
-    resolveLifted(at);
   };
   if (!loader || location.pathname !== '/' || matchMedia('(prefers-reduced-motion: reduce)').matches) {
     done();
@@ -44,12 +39,10 @@ export function startLoader(): void {
   }
   if (window.__loaderLifting) {
     resolveLifting(window.__loaderLifting);
-    window.__onLoaderLifted = (at) => resolveLifted(at);
     return;
   }
 
   window.__onLoaderLifting = (at) => resolveLifting(at);
-  window.__onLoaderLifted = (at) => resolveLifted(at);
 
   const bar = loader.querySelector<HTMLElement>('[data-bar]');
   const pct = loader.querySelector<HTMLElement>('[data-pct]');
@@ -68,7 +61,6 @@ export function startLoader(): void {
       const atLifted = performance.now();
       window.__loaderLifted = atLifted;
       loader.remove();
-      resolveLifted(atLifted);
     }, LIFT_MS);
   };
   requestAnimationFrame(step);

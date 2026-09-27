@@ -55,7 +55,6 @@
           setTimeout(() => {
             const atLifted = performance.now();
             window.__loaderLifted = atLifted;
-            if (window.__onLoaderLifted) window.__onLoaderLifted(atLifted);
             L.remove();
           }, LIFT_MS);
         };
