@@ -211,6 +211,8 @@ def test_corner_analysis(quali_slug):
                                     "biggest_gains", "biggest_losses"}
     # The ghost replay needs one time sample per grid point, for both laps.
     assert len(body["ghost"]["t_a"]) == len(body["ghost"]["t_b"]) > 0
+    assert len(body["sector_fractions"]) == 2
+    assert 0 < body["sector_fractions"][0] < body["sector_fractions"][1] < 1
 
 
 def test_same_driver_comparison_gets_distinguishable_labels(quali_slug):

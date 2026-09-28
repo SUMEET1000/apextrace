@@ -161,6 +161,7 @@ export interface CornerAnalysisResponse {
   summary: ComparisonSummary;
   segments: SegmentRow[];
   ghost: { t_a: (number | null)[]; t_b: (number | null)[] };
+  sector_fractions: number[];
   head_to_head: HeadToHeadRow[];
 }
 

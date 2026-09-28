@@ -517,6 +517,23 @@ def get_corner_analysis(
     h2h = (head_to_head(laps_df, driver1, driver2)
            if driver1 != driver2 and not laps_df.empty else pd.DataFrame())
 
+    sector_fractions = []
+    for driver, frame in ((driver1, frame_a), (driver2, frame_b)):
+        timed = laps_df[(laps_df["Driver"] == driver)
+                        & (laps_df["LapNumber"] == frame["LapNumber"].iloc[0])]
+        if timed.empty:
+            continue
+        s1, s2 = timed.iloc[0][["Sector1Time_s", "Sector2Time_s"]]
+        elapsed = frame["t"].to_numpy(dtype=float)
+        distance = frame["Distance"].to_numpy(dtype=float)
+        length = float(frame["LapLength"].iloc[0])
+        if (pd.notna(s1) and pd.notna(s2) and length > 0
+                and np.isfinite(elapsed).all() and np.isfinite(distance).all()
+                and elapsed[0] <= s1 < s1 + s2 <= elapsed[-1]):
+            sector_fractions = [float(np.interp(t, elapsed, distance) / length)
+                                for t in (s1, s1 + s2)]
+            break
+
     return {
         "driver_a": driver1,
         "driver_b": driver2,
@@ -536,6 +553,7 @@ def get_corner_analysis(
             "t_a": [jsonable(v) for v in frame_a["t"].to_numpy()],
             "t_b": [jsonable(v) for v in frame_b["t"].to_numpy()],
         },
+        "sector_fractions": sector_fractions,
         "head_to_head": records(h2h),
     }
 

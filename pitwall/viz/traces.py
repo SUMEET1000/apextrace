@@ -203,10 +203,14 @@ def corner_delta_bars_data(comparison: pd.DataFrame, *, name_a: str, name_b: str
         return dict(labels=[], delta_s=[], faster=[], x_unit="segment", y_unit="s",
                     finding="No comparable segments are available.")
     values = comparison["delta_s"].to_numpy()
+    gain = round(float(comparison["delta_s"].sum()), 3)
+    winner = name_a if gain > 0 else name_b if gain < 0 else None
     return dict(labels=comparison["label"].tolist(), delta_s=values,
                 faster=[name_a if v > 0 else name_b for v in values],
                 x_unit="segment", y_unit="s",
-                finding=f"{name_a} gained {values.sum():.3f} s across the segments against {name_b}.")
+                finding=(f"{winner} gained {abs(gain):.3f} s across the segments against "
+                         f"{name_b if winner == name_a else name_a}." if winner else
+                         f"The segments are even at 0.000 s between {name_a} and {name_b}."))
 
 
 def corner_delta_bars(comparison: pd.DataFrame, *, name_a: str, name_b: str,

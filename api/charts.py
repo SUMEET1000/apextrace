@@ -151,14 +151,17 @@ def _corner_delta_bars(slug: str, p: dict[str, str], data: bool = False):
     result = render(comparison, name_a=name_a, name_b=name_b)
     if data and not comparison.empty:
         corners = comparison.loc[comparison["kind"] == "corner", "delta_s"]
+        gain = round(float(corners.sum()), 3)
+        winner = name_a if gain > 0 else name_b if gain < 0 else None
         names = cache.load_artefact(slug, "results")
-        full_name = name_a
-        if {"Abbreviation", "FullName"}.issubset(names.columns):
-            match = names.loc[names["Abbreviation"] == name_a, "FullName"]
+        full_name = winner
+        if winner and {"Abbreviation", "FullName"}.issubset(names.columns):
+            match = names.loc[names["Abbreviation"] == winner, "FullName"]
             if not match.empty:
                 full_name = str(match.iloc[0]).split()[-1]
-        result["finding"] = (f"{full_name} gained {corners.sum():.3f} s in the corners "
-                             f"against {name_b}.")
+        result["finding"] = (f"{full_name} gained {abs(gain):.3f} s in the corners "
+                             f"against {name_b if winner == name_a else name_a}."
+                             if winner else f"The corners are even at 0.000 s between {name_a} and {name_b}.")
     return result
 
 

@@ -196,9 +196,13 @@ def test_missing_discrete_telemetry_stays_null():
 def test_fixed_findings():
     q = client.get("/api/chart-data/corner-delta-bars",
                    params={"slug": Q, **DRIVERS})
+    monza = client.get("/api/chart-data/corner-delta-bars",
+                       params={"slug": "2024/16_R", "driver1": "LEC", "driver2": "PIA",
+                               "lap1": 2, "lap2": 2})
     r = client.get("/api/chart-data/degradation-bars", params={"slug": R})
-    assert q.status_code == r.status_code == 200
+    assert q.status_code == monza.status_code == r.status_code == 200
     assert q.json()["finding"] == "Russell gained 0.326 s in the corners against VER."
+    assert monza.json()["finding"] == "Piastri gained 0.537 s in the corners against LEC."
     assert r.json()["finding"] == "SOFT tyres lose 0.116 s per lap on average."
 
 
