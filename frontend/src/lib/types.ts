@@ -2,7 +2,7 @@
  *
  * These mirror the endpoints in `api/main.py`. Anything typed `unknown` here
  * is a frame whose columns depend on the data (a rejection table, a stint
- * fit) and is rendered by DataTable from its own column spec rather than
+ * fit) and is rendered by a table from its own column spec rather than
  * being destructured field by field. */
 
 export interface ManifestSession {
@@ -38,24 +38,10 @@ export interface ManifestResponse {
   featured: FeaturedSession[];
 }
 
-export interface ThemeResponse {
-  colours: Record<string, string>;
-  series: string[];
-  compound_colours: Record<string, string>;
-  session_labels: Record<string, string>;
-  race_sessions: string[];
-  plotly_config: Record<string, unknown>;
-  fuel_effect_s_per_kg: number;
-}
-
 export interface Outline {
   x: number[];
   y: number[];
   corners?: { x: number[]; y: number[]; labels: string[] };
-}
-
-export interface Circuit extends Outline {
-  name: string;
 }
 
 /** One selectable lap, with everything the selector labels it with.
@@ -96,18 +82,6 @@ export interface SessionResponse {
   trackmap: Outline;
   results: Record<string, unknown>[];
   availability: { summary: CoverageSummary; reasons: RejectionRow[] };
-}
-
-export interface HomeResponse {
-  slug: string;
-  meta: ManifestSession;
-  session_label: string;
-  fastest: { driver: string; lap_time: string } | null;
-  track_temp: { mean: number; swing: number } | null;
-  classification: Record<string, unknown>[];
-  classification_columns: string[];
-  fastest_per_driver: Record<string, string>[];
-  circuit_lead: string | null;
 }
 
 export interface SegmentRow {

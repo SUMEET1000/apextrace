@@ -1,7 +1,6 @@
 /** The three data states every fetching screen shows: loading, empty, error.
  *
- * Each box carries `.tokens`, so it keeps 08's ink even inside the old dark
- * pages. `aria-busy` on the loading box is what scripts/ui/gate.py waits on.
+ * `aria-busy` on the loading box is what scripts/ui/gate.py waits on.
  */
 
 import { useEffect, useState, type ReactNode } from 'react';

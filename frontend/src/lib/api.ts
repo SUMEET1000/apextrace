@@ -7,8 +7,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-  CornerAnalysisResponse, HomeResponse, ManifestResponse, RaceArcResponse,
-  SessionResponse, UndercutResponse, Circuit,
+  CornerAnalysisResponse, ManifestResponse, RaceArcResponse,
+  SessionResponse, UndercutResponse,
 } from './types';
 
 const API_BASE = '/api';
@@ -49,17 +49,11 @@ function query(params: Record<string, string | number | null | undefined>): stri
 export const fetchManifest = (s?: AbortSignal) =>
   get<ManifestResponse>('/manifest', s);
 
-export const fetchCircuits = (s?: AbortSignal) =>
-  get<{ circuits: Circuit[] }>('/circuits', s);
-
 export const fetchOpener = (prefer: string[], s?: AbortSignal) =>
   get<{ slug: string | null }>(`/opener${query({ prefer: prefer.join(',') })}`, s);
 
 export const fetchSession = (slug: string, s?: AbortSignal) =>
   get<SessionResponse>(`/session${query({ slug })}`, s);
-
-export const fetchHome = (slug: string, s?: AbortSignal) =>
-  get<HomeResponse>(`/home${query({ slug })}`, s);
 
 export const fetchCornerAnalysis = (
   slug: string, driver1: string, driver2: string,
@@ -76,14 +70,6 @@ export const fetchUndercut = (
   gapS: number, advantage: number, degRate: number, s?: AbortSignal,
 ) => get<UndercutResponse>(
   `/undercut${query({ gap_s: gapS, advantage, deg_rate: degRate })}`, s);
-
-/** The URL a chart's figure JSON is served from. */
-export function chartUrl(
-  id: string,
-  params: Record<string, string | number | null | undefined>,
-): string {
-  return `${API_BASE}/chart/${id}${query(params)}`;
-}
 
 export function fetchChartData<T>(
   id: string,

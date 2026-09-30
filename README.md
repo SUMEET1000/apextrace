@@ -143,10 +143,10 @@ FastF1 (official F1 timing API)
    pitwall/  — pure pandas/numpy analysis library (no UI, no web framework)
         │
         ▼
-   api/  — FastAPI: caching, JSON safety, chart figures over HTTP
+   api/  — FastAPI: caching, JSON safety, chart data over HTTP
         │
         ▼
-   frontend/  — React + TypeScript: layout, widgets and deep links only
+   frontend/  — React + TypeScript: SVG charts, controls and deep links
 ```
 
 `pitwall/` never imports a UI or web framework. Every analysis function is
@@ -154,10 +154,11 @@ unit-testable and can be lifted into a notebook unchanged — which is why
 replacing the original Streamlit frontend with React was a change to `api/`
 and `frontend/` and touched no analysis code at all.
 
-The charts are the same figures either way: `api/charts.py` calls the existing
-`pitwall/viz` builders and serves `fig.to_json()`, which the browser renders
-with a version-matched plotly.js. Nothing about a chart is re-implemented in
-the frontend.
+The browser draws native SVG charts from `/api/chart-data/*`. The shared
+`pitwall/viz` data builders supply fitted values, confidence intervals, box
+statistics and missing-data gaps; the frontend places those marks without
+recomputing the analysis. The figure endpoints remain available for Python
+consumers.
 
 ### The design decision that made it shippable
 
@@ -257,7 +258,7 @@ protanopia), normal-vision floor and 3:1 contrast.
 
 The official Pirelli tyre colours **fail** that same check — soft (red) against
 intermediate (green) collapses to ΔE 3.5 under deuteranopia, and hard is pure
-white with zero chroma. The dark charts keep this familiar convention. Race Arc's
+white with zero chroma. Python figures keep this familiar convention. Race Arc's
 light charts use dark amber for medium, slate for hard and dark green for
 intermediate, with stronger dot opacity for contrast against the paper surface.
 Compound colour is never the only channel: every
@@ -279,11 +280,11 @@ shared x-axis. Two arbitrary scalings on one frame manufacture correlations.
 | `pitwall/degradation.py` | Per-stint OLS (HC3), compound pooling, AIC cliff detection |
 | `pitwall/evolution.py` | The pooled track-evolution model |
 | `pitwall/strategy.py` | Stints, race pace, pit loss, undercut |
-| `pitwall/viz/` | Shared theme and one figure builder per view |
+| `pitwall/viz/` | Shared chart-data builders, Python figures and theme |
 | `scripts/build_dataset.py` | ETL CLI |
 | `scripts/validate_dataset.py` | Post-build integrity checks |
-| `api/` | FastAPI service: cached loaders, JSON endpoints, chart figures |
-| `frontend/` | React + TypeScript UI, Vite build |
+| `api/` | FastAPI service: cached loaders, JSON chart data and figures |
+| `frontend/` | React + TypeScript UI with native SVG charts, Vite build |
 
 ---
 

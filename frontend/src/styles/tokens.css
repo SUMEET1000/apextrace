@@ -1,9 +1,6 @@
 /* Design tokens of the kept 2A.5 page, landings/08-finished.html: sheet.css's
  * :root with 08's own overrides baked in (yellow ink since 24 Sept 2026, grain
- * .45 from tweaks.json). Light only; there is no dark theme.
- *
- * Also declared on .tokens, so a shared state box keeps this ink when it sits
- * inside .pw-legacy, whose old --ink is white (legacy.css). */
+ * .45 from tweaks.json). Light only; there is no dark theme. */
 
 :root, .tokens {
   --paper: #E7E7E3;

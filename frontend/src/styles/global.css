@@ -1,11 +1,7 @@
 /* Base rules and the shell of landings/08-finished.html: sheet.css plus 08's own
  * <style> blocks, with the 26 Sept 2026 readability values as final - body 16 px,
  * .lab 13 px (sheet.css had 11), buttons 14 px, no text under 12 px, ink focus
- * ring, yellow selection, ink scrollbar, 44 px phone touch targets.
- *
- * Landing sections (loader, hero, count, grid, cards, method, spec, end sheet)
- * arrive with the landing in Step 3. The old dark pages keep their own rules in
- * legacy.css until Steps 5-6. */
+ * ring, yellow selection, ink scrollbar, 44 px phone touch targets. */
 
 @import './tokens.css';
 
