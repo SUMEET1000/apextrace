@@ -257,9 +257,10 @@ protanopia), normal-vision floor and 3:1 contrast.
 
 The official Pirelli tyre colours **fail** that same check — soft (red) against
 intermediate (green) collapses to ΔE 3.5 under deuteranopia, and hard is pure
-white with zero chroma. They are kept anyway, because every F1 viewer already
-reads them and substituting invented colours would make the tool worse for its
-users. The mitigation is that compound colour is never the only channel: every
+white with zero chroma. The dark charts keep this familiar convention. Race Arc's
+light charts use dark amber for medium, slate for hard and dark green for
+intermediate, with stronger dot opacity for contrast against the paper surface.
+Compound colour is never the only channel: every
 compound is labelled in text, and the degradation view facets by compound
 rather than colouring by it.
 

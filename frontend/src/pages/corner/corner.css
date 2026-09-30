@@ -9,11 +9,14 @@
 .corner-progress:hover u b { opacity: 1; }
 .corner-mast { display: flex; justify-content: space-between; gap: 20px; padding: 20px 0 16px; border-bottom: var(--bw) solid var(--ink); }
 .corner-title { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 5vw; padding: 10px 0 20px; }
+.corner-page:not(.race-page) .corner-title { grid-template-columns: minmax(0, 1fr) clamp(280px, 21vw, 340px); gap: clamp(20px, 3vw, 56px); }
 .corner-title h1 { font-size: clamp(52px, 6.8vw, 124px); line-height: .94; margin: 18px 0 26px; }
 .corner-title h1 em { font-style: normal; color: var(--paper); -webkit-text-stroke: 2px var(--ink); }
 .corner-title p { max-width: 62ch; font-size: 17px; }
 .corner-title-stamp { min-height: 240px; background: var(--acc); border: var(--bw) solid var(--ink); display: flex; flex-direction: column; justify-content: space-between; padding: 18px; font-size: 13px; }
 .corner-title-stamp strong { font: 900 33px/.95 var(--fd); }
+.corner-page:not(.race-page) .corner-title-stamp { min-height: 280px; padding: 22px; }
+.corner-page:not(.race-page) .corner-title-stamp strong { font-size: clamp(36px, 2.8vw, 48px); }
 .corner-picker { display: grid; grid-template-columns: 1fr 2fr 1fr; border: var(--bw) solid var(--ink); background: var(--ink); color: var(--paper); }
 .corner-picker label { min-width: 0; padding: 10px 16px 14px; border-right: 1px solid #777; font-size: 12px; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
 .corner-picker label:last-child { border-right: 0; }
@@ -147,7 +150,9 @@
 }
 @media (max-width: 900px) {
   .corner-title { grid-template-columns: 1fr; padding-top: 45px; }
+  .corner-page:not(.race-page) .corner-title { grid-template-columns: 1fr; }
   .corner-title-stamp { min-height: 100px; flex-direction: row; align-items: center; }
+  .corner-page:not(.race-page) .corner-title-stamp { min-height: 112px; }
   .corner-verdict { grid-template-columns: 1fr; }
   .corner-verdict svg { max-height: 280px; }
   .corner-stat-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -164,6 +169,8 @@
   .corner-title { padding: 32px 0 24px; }
   .corner-title-stamp { min-height: 76px; }
   .corner-title-stamp strong { font-size: 22px; }
+  .corner-page:not(.race-page) .corner-title-stamp { min-height: 94px; padding: 18px; }
+  .corner-page:not(.race-page) .corner-title-stamp strong { font-size: 26px; }
   .corner-picker { grid-template-columns: 1fr; }
   .corner-picker label { border-right: 0; border-bottom: 1px solid #777; }
   .corner-picker-laps { grid-template-columns: repeat(2, minmax(0, 1fr)); }

@@ -42,6 +42,14 @@ def main() -> int:
         print("npm is not on PATH; install Node.js to run the frontend.")
         return 1
 
+    process_options = {}
+    if sys.platform == "win32":
+        # Uvicorn reload sends Ctrl+C; separate consoles keep it away from Vite.
+        startup = subprocess.STARTUPINFO()
+        startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startup.wShowWindow = subprocess.SW_HIDE
+        process_options = {"creationflags": subprocess.CREATE_NEW_CONSOLE, "startupinfo": startup}
+
     started: list[subprocess.Popen] = []
     try:
         # Both launches sit inside the cleanup block. Starting the API before
@@ -51,9 +59,10 @@ def main() -> int:
             [str(VENV_PYTHON), "-m", "uvicorn", "api.main:app",
              "--host", "127.0.0.1", "--port", "8000", "--reload"],
             cwd=str(REPO_ROOT),
+            **process_options,
         )
         started.append(api)
-        web = subprocess.Popen([npm, "run", "dev"], cwd=str(FRONTEND), shell=False)
+        web = subprocess.Popen([npm, "run", "dev"], cwd=str(FRONTEND), shell=False, **process_options)
         started.append(web)
 
         print("\nApexTrace is starting")

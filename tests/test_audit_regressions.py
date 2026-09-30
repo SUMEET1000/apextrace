@@ -639,6 +639,10 @@ def _launcher(monkeypatch, fail_web: bool):
     calls = iter([api, web])
 
     def popen(*args, **kwargs):
+        if sys.platform == "win32":
+            assert kwargs.get("creationflags", 0) & 0x10
+            assert kwargs["startupinfo"].dwFlags & 1
+            assert kwargs["startupinfo"].wShowWindow == 0
         process = next(calls)
         if fail_web and process is web:
             raise OSError("frontend launch failed")

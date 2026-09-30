@@ -31,7 +31,8 @@ CASES = {
     "evolution-temperature": (R, {}),
     "stint-chart": (R, {}),
     "race-pace-box": (R, {}),
-    "gap-chart": (R, {"drivers": "VER,PER"}),
+    "gap-chart": (R, {"drivers": "VER,PER,SAI,NOR,LEC,RUS,HAM,PIA,HUL,ALO,"
+                                 "GAS,STR,SAR,TSU,RIC,ZHO,MAG,ALB,OCO,BOT"}),
     "position-chart": (R, {}),
     "undercut-chart": ("", {"gap_s": "1.5", "advantage": "0.8", "deg_rate": "0.12"}),
 }
@@ -157,6 +158,8 @@ def test_data_twin_matches_figure(chart_id):
             assert trace.name == box["driver"]
             same(trace.y, box["samples"])
     elif chart_id in {"gap-chart", "position-chart"}:
+        if chart_id == "gap-chart":
+            assert [row["driver"] for row in data["series"]] == params["drivers"].split(",")
         assert len(traces) == len(data["series"])
         for trace, row in zip(traces, data["series"]):
             same(trace.x, row["lap"])
@@ -200,9 +203,12 @@ def test_fixed_findings():
                        params={"slug": "2024/16_R", "driver1": "LEC", "driver2": "PIA",
                                "lap1": 2, "lap2": 2})
     r = client.get("/api/chart-data/degradation-bars", params={"slug": R})
-    assert q.status_code == monza.status_code == r.status_code == 200
+    evolution = client.get("/api/chart-data/evolution-curve", params={"slug": R})
+    assert q.status_code == monza.status_code == r.status_code == evolution.status_code == 200
     assert q.json()["finding"] == "Russell gained 0.326 s in the corners against VER."
     assert monza.json()["finding"] == "Piastri gained 0.537 s in the corners against LEC."
+    assert evolution.json()["finding"] == (
+        "The adjusted track estimate ends 0.372 s faster than at the first fitted point.")
     assert r.json()["finding"] == "SOFT tyres lose 0.116 s per lap on average."
 
 

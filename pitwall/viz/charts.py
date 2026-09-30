@@ -181,8 +181,9 @@ def evolution_curve_data(curve: pd.DataFrame,
                             evolution_s=naive["evolution_s"].to_numpy())
                        if naive is not None and not naive.empty else None),
                 x_unit="session fraction", y_unit="s")
-    data["finding"] = (f"The track changed lap time by {data['evolution_s'][-1] - data['evolution_s'][0]:+.3f} s across the session."
-                       if len(curve) else "Track evolution is unavailable.")
+    change = data["evolution_s"][-1] - data["evolution_s"][0]
+    data["finding"] = (f"The adjusted track estimate ends {abs(change):.3f} s "
+                       f"{'faster' if change < 0 else 'slower'} than at the first fitted point.")
     return data
 
 def evolution_curve(curve: pd.DataFrame, naive: pd.DataFrame | None = None,
@@ -468,11 +469,10 @@ def gap_chart_data(gaps: pd.DataFrame, drivers: list[str]) -> dict:
     if gaps.empty or not drivers:
         return dict(series=[], x_unit="lap", y_unit="s", y_direction="reversed",
                     finding="Choose drivers to compare their gap to the leader.")
-    chosen = drivers[:8]
     series = [dict(driver=driver,
                    lap=gaps.loc[gaps["Driver"] == driver, "LapNumber"].to_numpy(),
                    gap_s=gaps.loc[gaps["Driver"] == driver, "gap_s"].to_numpy())
-              for driver in chosen]
+              for driver in drivers]
     finishes = [(row["driver"], float(row["gap_s"][-1])) for row in series
                 if len(row["gap_s"]) and np.isfinite(row["gap_s"][-1])]
     closest = min(finishes, key=lambda item: item[1]) if finishes else None
@@ -485,7 +485,7 @@ def gap_chart_data(gaps: pd.DataFrame, drivers: list[str]) -> dict:
 def gap_chart(gaps: pd.DataFrame, drivers: list[str],
               *, results: pd.DataFrame | None = None,
               height: int = 480) -> go.Figure:
-    """Gap to the leader over the race for a chosen handful of drivers.
+    """Gap to the leader over the race for every selected driver.
 
     Lines take team colour where the results artefact supplies one, falling
     back to the categorical palette. Teammates share a colour exactly, so the

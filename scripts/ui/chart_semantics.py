@@ -1,4 +1,4 @@
-"""Check the Corner Analysis SVG geometry against fixed chart-data values.
+"""Check Corner Analysis and Race Arc SVG geometry against fixed chart-data values.
 
     .venv/Scripts/python scripts/ui/chart_semantics.py --base http://127.0.0.1:5173
 """
@@ -7,21 +7,284 @@ from __future__ import annotations
 
 import json
 import math
+import subprocess
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import Gate, parse, viewport, watch_errors  # noqa: E402
+from common import REPO, Gate, parse, viewport, watch_errors  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 
 ROUTE = "/corner-analysis?year=2024&round=12&session=Q&drivers=RUS,VER"
 
 
+def check_turn_placement(gate: Gate) -> None:
+    sys.path.insert(0, str(REPO))
+    from pitwall import store
+    from pitwall.viz.trackmap import corner_labels_data
+
+    tracks = []
+    for row in store.read_manifest().itertuples():
+        key = store.key_from_slug(row.slug)
+        track = store.read_artefact(key, "trackmap")
+        corners = corner_labels_data(store.read_artefact(key, "corners"))
+        tracks.append(dict(slug=row.slug, track=dict(
+            x=track["X"].tolist() if not track.empty else [],
+            y=track["Y"].tolist() if not track.empty else [],
+            corners=dict(x=list(corners["x"]), y=list(corners["y"]), labels=corners["labels"]))))
+    result = subprocess.run(["node", "--input-type=module", "-e", """
+        import fs from 'node:fs';
+        import ts from './frontend/node_modules/typescript/lib/typescript.js';
+        const source = ts.transpile(fs.readFileSync('frontend/src/lib/circuit.ts', 'utf8'),
+            {target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ES2022});
+        const {project, projectCornerMarks, placeTurnNumbers} = await import(
+            'data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+        const failures = [], missing = []; let checked = 0;
+        for (const {slug, track} of JSON.parse(fs.readFileSync(0, 'utf8'))) {
+            const path = project(track, 400, 260, 24);
+            if (!path) { missing.push(slug); continue; }
+            const marks = projectCornerMarks(track, 400, 260, track.corners, 24);
+            const labels = placeTurnNumbers(path, marks, 400, 260); checked++;
+            labels.forEach((a, i) => {
+                const distance = Math.hypot(a.x - marks[i].x, a.y - marks[i].y);
+                if (!(distance >= 8 && distance <= 41 && a.x >= 11 && a.x <= 389
+                    && a.y >= 10 && a.y <= 250)) failures.push(slug + ': misplaced ' + a.label);
+                for (const b of labels.slice(0, i)) {
+                    if (Math.abs(a.x - b.x) < Math.max(7, a.label.length * 3.5) + Math.max(7, b.label.length * 3.5)
+                        && Math.abs(a.y - b.y) < 12) failures.push(slug + ': overlapping ' + a.label + '/' + b.label);
+                }
+            });
+        }
+        console.log(JSON.stringify({checked, missing, failures}));
+    """], cwd=REPO, input=json.dumps(tracks), text=True, capture_output=True, check=True)
+    report = json.loads(result.stdout)
+    gate.check(report["checked"] > 0 and not report["failures"],
+               "all available session circuits keep turn labels nearby, inside the map and separate", report)
+
+RACE_FIXTURES = {
+    "degradation-scatter": dict(finding="A 1.000 s/lap fit is shown.", panels=[
+        dict(compound=compound, age=[1, 2, 3], lap_time_s=[90, None, 92],
+             fit=dict(age=[1, 2, 3], lap_time_s=[90, 91, 92], slope_s_per_lap=1))
+        for compound in ("SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET", "UNKNOWN")]),
+    "degradation-bars": dict(finding="SOFT loses 0.200 s/lap.",
+                             compounds=["SOFT", "MEDIUM", "HARD", "INTERMEDIATE", "WET", "UNKNOWN"],
+                             rate=[.2] * 6, lower=[.1] * 6, upper=[.3] * 6, n_stints=[2] * 6),
+    "session-best": dict(finding="The best reached 90.000 s.", minutes=[1, 2, 3],
+                         lap_time_s=[92, 91, 90], best_s=[92, 91, 90]),
+    "evolution-curve": dict(finding="The track changed by 0.400 s.",
+                            progress=[0, .25, .5, .75, 1],
+                            evolution_s=[0, -.1, None, -.3, -.4],
+                            lower=[-.05, -.15, None, -.35, -.45],
+                            upper=[.05, -.05, None, -.25, -.35],
+                            naive=dict(progress=[0, .5, 1], evolution_s=[0, .2, .4])),
+    "evolution-temperature": dict(finding="The track changed by 0.400 s.",
+                                  progress=[0, .25, .5, .75, 1],
+                                  evolution_s=[0, -.1, None, -.3, -.4],
+                                  lower=[-.05, -.15, None, -.35, -.45],
+                                  upper=[.05, -.05, None, -.25, -.35], naive=None,
+                                  temperature=dict(progress=[0, .5, 1], celsius=[30, 31, 29])),
+    "stint-chart": dict(finding="6 stints are shown.", order=["VER", "LEC"],
+                        stints=[dict(driver="VER", compound="SOFT", start_lap=1, end_lap=3),
+                                dict(driver="VER", compound="MEDIUM", start_lap=4, end_lap=6),
+                                dict(driver="LEC", compound="HARD", start_lap=1, end_lap=8),
+                                dict(driver="VER", compound="INTERMEDIATE", start_lap=7, end_lap=9),
+                                dict(driver="LEC", compound="WET", start_lap=9, end_lap=12),
+                                dict(driver="LEC", compound="UNKNOWN", start_lap=13, end_lap=20)]),
+    "race-pace-box": dict(finding="VER median is 90.000 s.", order=["VER"],
+                          boxes=[dict(driver="VER", q1=89, median=90, q3=91,
+                                      lo=88, hi=92, outliers=[95])]),
+    "gap-chart": dict(finding="VER has a 2.000 s gap by lap 3.",
+                      series=[dict(driver="VER", lap=[1, 2, 3], gap_s=[0, None, 2])]),
+    "position-chart": dict(finding="VER moved from P1 to P3.", series=[
+        dict(driver="VER", lap=[1, 2, 3], position=[1, 2, 3]),
+        dict(driver="PER", lap=[1, 2, 3], position=[2, 1, 2]),
+        dict(driver="SAI", lap=[1, 2, 3], position=[3, 3, 1])]),
+    "undercut-chart": dict(finding="The gain reaches 2.000 s after 3 laps.",
+                           laps=[1, 2, 3], gain_s=[0, 1, 2], gap_s=1.5, ahead=[False, False, True]),
+}
+
+
+def check_race(gate: Gate, browser, base: str, width: int) -> None:
+    def fixture(route):
+        chart = route.request.url.split('/chart-data/', 1)[1].split('?', 1)[0]
+        route.fulfill(status=200, content_type="application/json",
+                      body=json.dumps(RACE_FIXTURES[chart]))
+
+    routes = [
+        ("Tyre%20Degradation", ["degradation-scatter", "degradation-bars"]),
+        ("Track%20Evolution", ["evolution-curve", "evolution-temperature"]),
+        ("Race%20Strategy", ["stint-chart", "race-pace-box", "gap-chart",
+                                "position-chart", "undercut-chart"]),
+    ]
+    compound_colours = {}
+    for view, ids in routes:
+        page = browser.new_page(viewport=viewport(width))
+        page.route("**/api/chart-data/*", fixture)
+        page.goto(base.rstrip('/') + "/race-arc?year=2024&round=1&session=R&view=" + view,
+                  wait_until="domcontentloaded")
+        for chart in ids:
+            page.locator(f'[data-chart="{chart}"]').wait_for(state="visible", timeout=60_000)
+        shown = page.locator('[data-chart]').evaluate_all("nodes => nodes.map(n => n.dataset.chart)")
+        gate.check(shown == ids, f"{width}: {view} renders its complete chart set", shown)
+        progress = page.locator('.corner-progress')
+        before = progress.evaluate("e => getComputedStyle(e).height")
+        labels = progress.locator('b').all_text_contents()
+        expected = page.locator('.race-section .corner-section-title span').all_text_contents()
+        expected = ['SESSION', *[label.split(' / ', 1)[-1] for label in expected]]
+        page.mouse.move(4, 58)
+        page.wait_for_timeout(300)
+        gate.check(before == '5px' and progress.evaluate("e => getComputedStyle(e).height") == '12px'
+                   and labels == expected and bool(labels)
+                   and progress.locator('b').evaluate_all("nodes => nodes.every(e => getComputedStyle(e).opacity === '1')"),
+                   f"{width}: progress line expands on hover and shows its section labels", labels)
+        page.mouse.move(4, 10)
+        axis = page.locator('.race-plot .race-axis-title').all_text_contents()
+        gate.check(all(('s' in label.lower() or 'lap' in label.lower() or '%' in label
+                        or 'position' in label.lower() or '°C' in label) for label in axis),
+                   f"{width}: {view} SVG axes name their units", axis)
+        if view == "Tyre%20Degradation":
+            shares = page.locator('.corner-table-wrap').first.locator('tbody tr td:nth-child(3)').all_text_contents()
+            gate.check(shares == ['0.2%', '1.8%', '9.0%', '1.5%'],
+                       f"{width}: rejection shares retain the API percentage unit", shares)
+            dots = page.locator('[data-chart="degradation-scatter"] circle').count()
+            ci = page.locator('[data-chart="degradation-bars"] line').first.evaluate(
+                "e => [parseFloat(e.getAttribute('x1')), parseFloat(e.getAttribute('x2'))]")
+            gate.check(dots == 12 and 390 <= ci[0] <= 392 and 747 <= ci[1] <= 749,
+                       f"{width}: scatter omits null and 95% whisker matches fixture", [dots, ci])
+            marks = page.locator('[data-chart="degradation-scatter"] .race-panel').evaluate_all("""panels => {
+                const rgb = value => value.match(/[\\d.]+/g).slice(0, 3).map(Number);
+                const luminance = colour => colour.map(c => c / 255)
+                    .map(c => c <= .04045 ? c / 12.92 : ((c + .055) / 1.055) ** 2.4)
+                    .reduce((sum, c, i) => sum + c * [.2126, .7152, .0722][i], 0);
+                return panels.map(panel => {
+                    const dot = panel.querySelector('circle'), style = getComputedStyle(dot);
+                    const background = rgb(getComputedStyle(panel.closest('figure')).backgroundColor);
+                    const opacity = Number(style.opacity) * Number(style.fillOpacity);
+                    const colour = rgb(style.fill).map((c, i) => c * opacity + background[i] * (1 - opacity));
+                    const a = luminance(colour), b = luminance(background);
+                    return {compound: panel.querySelector('h3').textContent.split(' · ')[0], colour: style.fill,
+                        contrast: (Math.max(a, b) + .05) / (Math.min(a, b) + .05)};
+                });
+            }""")
+            compound_colours = {mark['compound']: mark['colour'] for mark in marks}
+            bar_colours = page.locator('[data-chart="degradation-bars"] [data-race-grow]').evaluate_all(
+                "nodes => nodes.map(e => getComputedStyle(e).fill)")
+            gate.check(len(marks) == 6 and all(mark['contrast'] >= 3 for mark in marks)
+                       and bar_colours == list(compound_colours.values()),
+                       f"{width}: every tyre dot reaches 3:1 contrast and matches its degradation bar", marks)
+        elif view == "Track%20Evolution":
+            model = page.locator('[data-chart="evolution-curve"] svg.race-plot > path:not(.race-interval)').first.get_attribute('d') or ''
+            bands = page.locator('[data-chart="evolution-curve"] .race-interval').count()
+            temperature = page.locator('[data-chart="evolution-temperature"] .race-panel svg').count()
+            gate.check(model.count('M') == 2 and bands == 2 and temperature == 1,
+                       f"{width}: evolution gaps and split confidence band survive", [model[:90], bands, temperature])
+        else:
+            advantage = page.locator('.race-calculator .race-range').nth(1)
+            gate.check(advantage.locator('input').input_value() == '0.14'
+                       and '0.14 s/lap' in advantage.inner_text(),
+                       f"{width}: fresh-tyre advantage matches its native slider", advantage.inner_text())
+            stints = page.locator('[data-chart="stint-chart"] rect').count()
+            median = page.locator('[data-chart="race-pace-box"] line[stroke="#E23B2E"]').count()
+            gap = page.locator('[data-chart="gap-chart"] svg.race-plot > path').first.get_attribute('d') or ''
+            position = page.locator('[data-chart="position-chart"]')
+            gate.check(position.locator('svg.race-plot > path').count() == 3
+                       and position.locator('.race-legend span').all_text_contents() == ['VER', 'PER', 'SAI'],
+                       f"{width}: position chart initially shows every driver")
+            position.get_by_role('button', name='COMPARE TWO DRIVERS', exact=True).click()
+            pos = position.locator('svg.race-plot > path[stroke="#131313"]').get_attribute('d') or ''
+            ranks = position.locator('.race-axes g text').all_text_contents()
+            labels = position.locator('.race-line-end').all_text_contents()
+            undercut = page.locator('[data-chart="undercut-chart"] svg.race-plot > path').count()
+            coords = [float(part.split(',')[1]) for part in pos.replace('M', 'L').split('L') if ',' in part]
+            gate.check(stints == 6 and median == 1 and gap.count('M') == 2
+                       and len(coords) == 3 and coords[0] < coords[-1] and undercut == 2
+                       and ranks == ["P1", "P2", "P3"] and labels == ["VER", "PER"]
+                       and position.locator('svg.race-plot > path').count() == 2,
+                       f"{width}: stints, box median, gap break, integer positions and driver labels",
+                       [stints, median, gap[:70], coords, ranks, labels, undercut])
+            blocks = page.locator('[data-chart="stint-chart"] [data-race-grow]').evaluate_all(
+                "nodes => nodes.map(e => [e.querySelector('title').textContent.split(' · ')[1], getComputedStyle(e).fill])")
+            key = page.locator('[data-chart="stint-chart"] .race-compound-key span').evaluate_all(
+                "nodes => nodes.map(e => [e.textContent, getComputedStyle(e.querySelector('i')).backgroundColor])")
+            gate.check(blocks == key and all(colour == compound_colours[compound] for compound, colour in blocks),
+                       f"{width}: tyre colours match dots, rate bars, stint blocks and legend", blocks)
+            position.locator('.race-position-compare select').nth(1).select_option('SAI')
+            compared = position.locator('.race-line-end').all_text_contents()
+            gate.check(compared == ["VER", "SAI"],
+                       f"{width}: driver comparison changes the highlighted position line", compared)
+            position.get_by_role('button', name='ALL DRIVERS', exact=True).click()
+            gate.check(position.locator('svg.race-plot > path').count() == 3
+                       and position.locator('.race-position-compare select').count() == 0,
+                       f"{width}: leaving comparison restores all drivers")
+        page.close()
+
+    qualifying = browser.new_page(viewport=viewport(width))
+    qualifying.route("**/api/chart-data/*", fixture)
+    qualifying.goto(base.rstrip('/') + "/race-arc?year=2024&round=12&session=Q&view=Track%20Evolution",
+                    wait_until="domcontentloaded")
+    best = qualifying.locator('[data-chart="session-best"]')
+    best.wait_for(state="visible", timeout=60_000)
+    gate.check(best.locator('circle').count() == 3 and best.locator('svg.race-plot > path').count() == 1,
+               f"{width}: qualifying draws the session-best curve without a race model")
+    qualifying.close()
+
+    live = browser.new_page(viewport=viewport(width))
+    live.goto(base.rstrip('/') + "/race-arc?year=2024&round=1&session=R&view=Race%20Strategy",
+              wait_until="domcontentloaded")
+    live.locator('[data-chart="gap-chart"]').wait_for(state="visible", timeout=60_000)
+    checkboxes = live.locator('.race-drivers input')
+    for checkbox in checkboxes.all():
+        checkbox.check()
+    live.wait_for_function("document.querySelectorAll('[data-chart=\"gap-chart\"] svg.race-plot > path').length === 20")
+    gate.check(checkboxes.count() == 20 and live.locator('.race-drivers input:checked').count() == 20
+               and live.locator('[data-chart="gap-chart"] svg.race-plot > path').count() == 20,
+               f"{width}: all 20 selected drivers plot")
+    for chart in ('gap-chart', 'position-chart'):
+        plot = live.locator(f'[data-chart="{chart}"]')
+        strokes = plot.locator('svg.race-plot > path').evaluate_all(
+            "nodes => nodes.map(e => [e.getAttribute('stroke'), e.getAttribute('stroke-dasharray')])")
+        samples = plot.locator('.race-legend line').evaluate_all(
+            "nodes => nodes.map(e => [e.getAttribute('stroke'), e.getAttribute('stroke-dasharray')])")
+        colours = [stroke[0] for stroke in strokes]
+        gate.check(len(colours) == len(set(colours)) == 20 and samples == strokes,
+                   f"{width}: {chart} has 20 unique driver colours and matching legend marks",
+                   f"{len(set(colours))} colours")
+        if chart == 'position-chart':
+            gate.check(all(stroke[1] is None for stroke in strokes),
+                       f"{width}: all-driver position lines are solid")
+    live.close()
+    for year, round_, event in ((2026, 6, 'Monaco'), (2024, 2, 'Jeddah')):
+        circuit = browser.new_page(viewport=viewport(width), reduced_motion='reduce')
+        circuit.route("**/api/chart-data/*", fixture)
+        circuit.goto(base.rstrip('/') + f"/race-arc?year={year}&round={round_}&session=R&view=Race%20Strategy",
+                     wait_until="domcontentloaded")
+        drawing = circuit.locator('.race-circuit svg')
+        drawing.wait_for(state='visible', timeout=60_000)
+        geometry = drawing.evaluate("""svg => {
+            const groups = [...svg.querySelectorAll('g')];
+            const boxes = groups.map(g => g.querySelector('text').getBBox());
+            return {count: groups.length, linked: groups.every(g => {
+                const dot = g.querySelector('circle'), line = g.querySelector('line'), text = g.querySelector('text');
+                return line && line.getAttribute('x1') === dot.getAttribute('cx')
+                    && line.getAttribute('y1') === dot.getAttribute('cy')
+                    && line.getAttribute('x2') === text.getAttribute('x')
+                    && Math.abs(Number(line.getAttribute('y2')) + 4 - Number(text.getAttribute('y'))) < .001;
+            }), clear: boxes.every((a, i) => a.x >= 0 && a.y >= 0 && a.x + a.width <= 400 && a.y + a.height <= 260
+                && boxes.slice(0, i).every(b => a.x + a.width <= b.x || b.x + b.width <= a.x
+                    || a.y + a.height <= b.y || b.y + b.height <= a.y))};
+        }""")
+        gate.check(geometry['count'] == (19 if event == 'Monaco' else 27)
+                   and geometry['linked'] and geometry['clear'],
+                   f"{width}: {event} turn numbers connect to their anchors without overlap or clipping", geometry)
+        circuit.close()
+
+
 def main() -> None:
     args = parse(__doc__, widths=(1440, 390),
                  extra=lambda p: p.add_argument("--seed-defect", action="store_true"))
     gate = Gate()
+    check_turn_placement(gate)
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         for width in args.widths:
@@ -300,6 +563,7 @@ def main() -> None:
             gate.check(static_fill.evaluate("e => getComputedStyle(e).transform") == 'none',
                        f"{width}: reduced motion shows complete segment bars immediately")
             reduced.close()
+            check_race(gate, browser, args.base, width)
         browser.close()
     gate.exit()
 

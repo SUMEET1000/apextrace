@@ -62,7 +62,7 @@ export function placeCornerMarks(track: Projected, corners: CornerMark[], width:
   return placed;
 }
 
-/** Place a small turn number beside its measured point, along the local track normal. */
+/** Place a small turn number near its measured point, preferring the local track normal. */
 export function placeTurnNumbers(track: Projected, corners: CornerMark[], width: number,
                                  height: number): CornerMark[] {
   const result = corners.map((corner) => ({ ...corner }));
@@ -85,18 +85,20 @@ export function placeTurnNumbers(track: Projected, corners: CornerMark[], width:
     const length = Math.hypot(dx, dy) || 1;
     const nx = -dy / length; const ny = dx / length;
     let best = { ...corner }; let bestScore = Infinity;
-    for (const radius of [16, 21, 27, 34]) for (const side of [-1, 1]) for (const shift of [0, -6, 6]) {
-      const x = corner.x + nx * radius * side + dx / length * shift;
-      const y = corner.y + ny * radius * side + dy / length * shift;
+    for (const radius of [16, 21, 27, 34]) for (const direction of [0, 6, -1, 1, -2, 2, -3, 3, -4, 4, -5, 5]) {
+      const angle = direction * Math.PI / 6;
+      const x = corner.x + (nx * Math.cos(angle) + dx / length * Math.sin(angle)) * radius;
+      const y = corner.y + (ny * Math.cos(angle) + dy / length * Math.sin(angle)) * radius;
       const halfWidth = Math.max(7, corner.label.length * 3.5);
       if (x < halfWidth + 4 || x > width - halfWidth - 4 || y < 10 || y > height - 10) continue;
-      let score = radius + Math.abs(shift) * .3;
+      let score = radius + Math.abs(Math.sin(angle)) * 2;
+      let clearance = Infinity;
       for (let i = 0; i < track.x.length; i++) {
         const outsideX = Math.max(0, Math.abs(track.x[i] - x) - halfWidth);
         const outsideY = Math.max(0, Math.abs(track.y[i] - y) - 6);
-        const clearance = Math.hypot(outsideX, outsideY);
-        if (clearance < 5) score += (5 - clearance) * 300;
+        clearance = Math.min(clearance, Math.hypot(outsideX, outsideY));
       }
+      if (clearance < 5) score += (5 - clearance) * 300;
       for (const otherIndex of placed) {
         const other = result[otherIndex];
         const otherHalf = Math.max(7, other.label.length * 3.5);
