@@ -15,13 +15,13 @@ section{position:relative;padding:14vh 4vw}.sheet{border-top:var(--bw) solid var
 /* Hero: 05E Monaco x Green Hell. Title panel left, circuit and ghost lap only in the right
    column, both under the photo band, so the two never share pixels. */
 .hero{height:100vh;min-height:760px;padding:0;overflow:hidden}
-.hero .photo{position:absolute;left:0;right:0;top:56px;height:26vh;background:var(--paper);border-bottom:var(--bw) solid var(--ink);overflow:hidden}.hero .photo canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hero .photo{position:absolute;left:0;right:0;top:var(--header-height,56px);height:26vh;background:var(--paper);border-bottom:var(--bw) solid var(--ink);overflow:hidden}.hero .photo canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .hero .photo::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 40%,var(--acc));mix-blend-mode:multiply;opacity:.8}
 .cross{position:absolute;inset:0;pointer-events:none}.cross i{position:absolute;border:0 dashed #13131366}.cross .h{left:0;right:0;border-top-width:1px}.cross .v{top:0;bottom:0;border-left-width:1px}
-.panel{position:absolute;left:2vw;top:calc(56px + 16vh);width:36vw;z-index:4;border:var(--bw) solid var(--ink)}.panel .top{display:flex;justify-content:space-between;align-items:center;padding:10px 12px}
+.panel{position:absolute;left:2vw;top:calc(var(--header-height,56px) + 16vh);width:36vw;z-index:4;border:var(--bw) solid var(--ink)}.panel .top{display:flex;justify-content:space-between;align-items:center;padding:10px 12px}
 .panel h1{font-size:clamp(40px,4.9vw,92px);padding:4px 12px 12px;white-space:nowrap}.panel .foot{padding:14px 12px 16px;border-top:var(--bw) solid var(--ink);background:var(--paper)}
 .strip{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid #13131366}.strip span{padding:8px 12px}
-.stage{position:absolute;left:40vw;right:2vw;top:calc(56px + 26vh + 3vh);bottom:4vh}.stage svg{width:100%;height:100%;overflow:visible}
+.stage{position:absolute;left:40vw;right:2vw;top:calc(var(--header-height,56px) + 26vh + 3vh);bottom:4vh}.stage svg{width:100%;height:100%;overflow:visible}
 .ann{position:absolute;z-index:3}.ann b{display:block;font:700 13px var(--fm)}
 /* Answer: 06D pinned counter */
 .count{height:100vh;display:grid;grid-template-columns:1.2fr 1fr;gap:4vw;align-items:center;padding:0 4vw}
@@ -42,7 +42,8 @@ section{position:relative;padding:14vh 4vw}.sheet{border-top:var(--bw) solid var
 .proofline{font:400 clamp(60px,9vw,170px)/.95 var(--fd);text-transform:uppercase}.proofline span{color:var(--paper);-webkit-text-stroke:3px var(--ink)}.proofline b{font-weight:400;background:var(--acc);padding:0 .1em}
 /* Credits: 06A */
 .credits{text-align:center;padding:16vh 4vw}.credits .lab{display:block;margin:26px 0 6px}.credits .k{font-size:clamp(60px,9vw,160px)}.credits nav{display:flex;justify-content:center;gap:4vw;margin:6vh 0;font:400 28px var(--fd);text-transform:uppercase}.credits nav a:hover{background:var(--acc)}
-@media(max-width:860px){.ann{display:none}.hero{height:auto;min-height:0;padding:calc(56px + 26vh + 3vh) 4vw 4vh}.panel,.stage{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:auto}.stage{height:44vh;margin-top:4vh}.tl h3{font-size:26px}.eq{font-size:15px}.count{grid-template-columns:1fr;height:auto;padding:12vh 4vw}.sc{grid-template-columns:1fr}.sc .r{border-left:0;border-top:var(--bw) solid var(--ink)}.tl{padding-left:70px}.tl .st::before{left:-66px}.credits nav{flex-direction:column}}
+@media(max-width:860px){.ann{display:none}.hero{height:auto;min-height:0;padding:calc(var(--header-height,56px) + 26vh + 3vh) 4vw 4vh}.panel,.stage{position:relative;left:auto;right:auto;top:auto;bottom:auto;width:auto}.stage{height:44vh;margin-top:4vh}.tl h3{font-size:26px}.eq{font-size:15px}.count{grid-template-columns:1fr;height:auto;padding:12vh 4vw}.sc{grid-template-columns:1fr}.sc .r{border-left:0;border-top:var(--bw) solid var(--ink)}.tl{padding-left:70px}.tl .st::before{left:-66px}.credits nav{flex-direction:column}}
+@media(max-width:380px){.count .big{font-size:27.5vw}.index{grid-template-columns:repeat(3,minmax(0,1fr));overflow-wrap:anywhere}.sc{grid-template-columns:minmax(0,1fr)}.sc .v{font-size:48px}}
 /* tweaks.json (saved 23 Sept 2026), baked: grain, button hover and press. The ink is 05E's
    yellow since 24 Sept 2026. */
 :root{--acc:#F2E600;--grain:.45}
@@ -97,6 +98,7 @@ header nav a:hover,.credits nav a:hover{background:linear-gradient(var(--acc),va
 .sp p{font-size:14px;line-height:1.5;max-width:30ch;margin-top:10px}
 .spec .roll .s{transition:none}
 @media(max-width:860px){.spec{grid-template-columns:1fr 1fr}.sp:nth-child(2){border-right:0}.sp:nth-child(-n+2){border-bottom:var(--bw) solid var(--ink)}.sp{padding:20px 16px 24px}}
+@media(max-width:380px){.spec{grid-template-columns:repeat(2,minmax(0,1fr));overflow-wrap:anywhere}.sp b{font-size:48px}}
 .roll .s i{font-style:normal;display:block;height:1em;line-height:1em;text-align:center}
 /* Corner grid: Verstappen's corners are solid ink with paper type, Russell's stay yellow, so
    both drivers read as filled. */
@@ -123,8 +125,8 @@ body{font-size:16px}.lab{font-size:13px}header nav{gap:26px}.btn{font-size:14px}
 /* Unlit gap rows stay readable (meets 4.5:1 WCAG AA on paper) so the scroll reveal passes contrast. */
 .count li{opacity:.68}
 /* Phone: the section links move to a bar along the bottom edge instead of disappearing. */
-@media(max-width:860px){header nav{display:flex;position:fixed;left:0;right:0;bottom:0;height:52px;justify-content:space-around;align-items:center;gap:0;background:var(--paper);border-top:var(--bw) solid var(--ink);z-index:41}
-  header nav a{padding:14px 8px}body{padding-bottom:52px}}
+@media(max-width:860px){header nav{display:flex;position:fixed;left:0;right:0;bottom:0;min-height:52px;height:auto;flex-wrap:wrap;justify-content:space-around;align-items:center;gap:0;background:var(--paper);border-top:var(--bw) solid var(--ink);z-index:41}
+  header nav a{padding:14px 8px}body{padding-bottom:var(--bottom-nav-height,52px)}}
 @media(max-width:480px){.hdr-r .lab{font-size:12px}}
 /* Chart text is in viewBox units: a phone draws the 400-wide chart near 300 px, so 16 units reads as about 12 px. */
 @media(max-width:860px){.qc text{font-size:16px}}

@@ -38,6 +38,18 @@ CORNER_409 = ("Corner analysis is unavailable for this session because 2 corner 
 NO_LAP_DATA = "No lap data available for this session"
 
 BUSY = "document.querySelector('[aria-busy=\"true\"]')"
+CLS = """window.__loadingCLS = {value: 0, session: 0, start: 0, last: 0};
+new PerformanceObserver(list => {
+  for (const entry of list.getEntries()) {
+    if (entry.hadRecentInput) continue;
+    const state = window.__loadingCLS;
+    if (entry.startTime - state.last > 1000 || entry.startTime - state.start > 5000) {
+      state.session = 0; state.start = entry.startTime;
+    }
+    state.session += entry.value; state.last = entry.startTime;
+    state.value = Math.max(state.value, state.session);
+  }
+}).observe({type: 'layout-shift', buffered: true});"""
 
 
 def text_of(page, selector: str) -> str:
@@ -66,6 +78,7 @@ def empty_session(route):
 
 def open_page(browser, base: str, route: str, width: int, setup):
     ctx = browser.new_context(viewport=viewport(width))
+    ctx.add_init_script(CLS)
     page = ctx.new_page()
     errors = watch_errors(page)
     setup(page)
@@ -121,6 +134,8 @@ def run(gate: Gate, browser, base: str, name: str, route: str, width: int) -> No
     alert = text_of(page, "[role=alert]")
     gate.check(not why and not alert and not errors, f"{tag} held: settles once the API answers",
                why or alert or errors[:2])
+    shift = page.evaluate("window.__loadingCLS.value")
+    gate.check(shift <= 0.1, f"{tag} held: loading layout shift stays within 0.1", shift)
     done(page, ctx)
 
     # empty manifest

@@ -1,7 +1,8 @@
 # ApexTrace — F1 Telemetry Analysis
 
-**Live: [apextrace.onrender.com](https://apextrace.onrender.com)** — it opens on Silverstone 2024,
-Russell vs Verstappen. Free hosting, so it sleeps when idle; the first request wakes it.
+**Live: [apextrace-site.onrender.com](https://apextrace-site.onrender.com)** — it opens on Silverstone 2024,
+Russell vs Verstappen. The frontend loads independently of the API. Free API hosting sleeps
+when idle; the first analysis request wakes it.
 
 An analysis tool for Formula 1 timing and telemetry data. It compares drivers
 corner by corner, measures tyre degradation with confidence intervals, and
@@ -211,7 +212,7 @@ delta time — the same limitation FastF1 documents. It is reported here rather
 than hidden, because it bounds what the corner-by-corner numbers can be trusted
 to.
 
-**64 tests**, run against synthetic data with known parameters:
+The suite combines synthetic data with known parameters, API checks and stored-session checks:
 
 ```bash
 .venv/Scripts/python -m pytest tests/ -q
@@ -297,8 +298,12 @@ ETL functions, which the UI does not touch. That means the built dataset is
 committed to the repo and the deployed app needs no credentials, no cron and
 no outbound access.
 
-Build the frontend once, and the API serves it from its own origin — one
-process, no separate static host:
+The public frontend is a Render Static Site publishing `frontend/dist`. Its
+`/api/*` rewrite forwards to the Docker web service at
+`https://apextrace.onrender.com/api/*`; other routes fall back to `index.html`.
+The settings are recorded in `render.yaml`.
+
+The API also serves the built frontend from its own origin. For a local production build:
 
 ```bash
 cd frontend && npm ci && npm run build && cd ..
@@ -307,7 +312,8 @@ cd frontend && npm ci && npm run build && cd ..
 
 `api/main.py` mounts `frontend/dist` only when it exists, and falls back to
 `index.html` for client-side routes so a hard refresh on `/corner-analysis`
-works. **Run a single worker:** the loaders in `api/cache.py` are per-process
+works. Responses of at least 1,000 bytes use gzip when the client accepts it,
+including JSON and built assets. **Run a single worker:** the loaders in `api/cache.py` are per-process
 and one of them holds a decoded race telemetry frame (~74 MB).
 
 Rebuilding the dataset is a local operation — re-run `build_dataset.py`, commit

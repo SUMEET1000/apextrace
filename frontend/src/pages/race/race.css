@@ -1,24 +1,24 @@
-.race-page { min-width: 0; }
+.race-page { min-width: 0; overflow-wrap: anywhere; }
 .race-page .corner-title-stamp strong { font-size: clamp(44px, 5.2vw, 88px); }
 .race-page .corner-title h1 { max-width: 11ch; }
 @media (min-width: 901px) {
   .race-page .corner-title { grid-template-columns: minmax(0, 1fr) minmax(300px, 28%); gap: clamp(20px, 2vw, 38px); }
   .race-page .corner-title h1 { font-size: clamp(72px, 8.2vw, 158px); }
 }
-.race-circuit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 38%); align-items: center; gap: 28px; margin-top: 18px; padding: 28px 34px; background: var(--acc); border: var(--bw) solid var(--ink); }
-.race-circuit h2 { font-size: clamp(38px, 5vw, 76px); line-height: 1; margin: 22px 0; }
+.race-circuit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 38%); align-items: center; gap: 20px; margin-top: 14px; padding: 18px 24px; background: var(--acc); border: var(--bw) solid var(--ink); }
+.race-circuit h2 { font-size: clamp(38px, 5vw, 76px); line-height: 1; margin: 12px 0; }
 .race-circuit p { font-size: 16px; }
-.race-circuit svg { display: block; width: 100%; max-height: 330px; }
+.race-circuit svg { display: block; width: 100%; max-height: 200px; }
 .race-assumptions { display: grid; grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); border: var(--bw) solid var(--ink); border-top: 0; }
-.race-assumptions > div, .race-range { min-width: 0; padding: 18px; border-right: 2px solid var(--ink); }
+.race-assumptions > div, .race-range { min-width: 0; padding: 14px; border-right: 2px solid var(--ink); }
 .race-assumptions > :last-child { border-right: 0; }
-.race-assumptions p { margin-top: 12px; font-size: 14px; }
+.race-assumptions p { margin-top: 8px; font-size: 14px; }
 .race-range { display: grid; align-content: space-between; gap: 10px; font-size: 12px; font-weight: 700; }
-.race-range > span { display: flex; justify-content: space-between; gap: 12px; }
+.race-range > span { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
 .race-range strong { font-size: 15px; white-space: nowrap; }
-.race-range input { width: 100%; min-height: 32px; accent-color: var(--ink); cursor: pointer; }
+.race-range input { width: 100%; min-height: 44px; accent-color: var(--ink); cursor: pointer; }
 .race-range small { font-size: 12px; font-weight: 400; }
-.race-tabs { display: flex; margin-top: 34px; border: var(--bw) solid var(--ink); }
+.race-tabs { display: flex; margin-top: 20px; border: var(--bw) solid var(--ink); }
 .race-tabs button { flex: 1; min-width: 0; min-height: 56px; padding: 12px 16px; border: 0; border-right: 2px solid var(--ink); background: var(--paper); color: var(--ink); font: 700 14px var(--fm); text-align: left; cursor: pointer; }
 .race-tabs button { transition: background-color .2s ease, color .2s ease; }
 .race-tabs button:last-child { border-right: 0; }
@@ -26,28 +26,29 @@
 .race-tabs button span { display: block; margin-bottom: 4px; font-size: 11px; }
 .race-tabs button:focus-visible, .race-range input:focus-visible, .race-drivers input:focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
 .race-updating { padding: 12px 0; font-size: 13px; }
-.race-glossary { max-width: 95ch; padding: 16px 0 0; font-size: 13px; line-height: 1.6; }
+.race-glossary { max-width: 75ch; padding: 12px 0 0; font-size: 13px; line-height: 1.6; }
 .race-section { padding-top: 54px; }
-.race-lead { max-width: 95ch; margin-bottom: 22px; font-size: 16px; line-height: 1.65; }
-.race-metrics { grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); border-top: var(--bw) solid var(--ink); }
+.race-view > .race-section:first-child { padding-top: 32px; }
+.race-lead { max-width: 72ch; margin-bottom: 18px; font-size: 16px; line-height: 1.65; }
+.race-metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.1875em), 1fr)); border-top: var(--bw) solid var(--ink); }
 .race-metrics > div { min-height: 165px; }
 .race-metrics strong { font-size: clamp(36px, 4.4vw, 74px); }
 .race-metrics small { font-size: 12px; line-height: 1.4; }
 .race-finding { max-width: 90ch; margin: 22px 0; padding: 20px 24px; border-left: 8px solid var(--ink); background: var(--acc); font-size: 18px; font-weight: 700; }
 .race-method { margin: 20px 0; padding: 15px 18px; border: 2px solid var(--ink); }
-.race-method summary { min-height: 40px; font-weight: 700; cursor: pointer; }
-.race-method p { margin: 14px 0; max-width: 90ch; }
+.race-method summary { min-height: 44px; font-weight: 700; cursor: pointer; }
+.race-method p { margin: 14px 0; max-width: 72ch; }
 .race-method code { display: block; max-width: 100%; padding: 12px; overflow-x: auto; background: #fff; }
 .race-chart figcaption { display: grid; gap: 9px; }
 .race-chart-title { font: 900 clamp(20px, 2vw, 30px) var(--fd); }
-.race-chart [data-finding] { font: 600 15px/1.5 var(--fm); }
-.race-chart-explain { max-width: 105ch; font: 400 14px/1.55 var(--fm); }
+.race-chart [data-finding] { max-width: 72ch; font: 600 15px/1.5 var(--fm); }
+.race-chart-explain { max-width: 72ch; font: 400 14px/1.55 var(--fm); }
 .race-chart > [data-chart] { min-width: 0; }
 .race-plot-scroll { max-width: 100%; overflow-x: auto; }
 .race-plot { display: block; width: 100%; min-width: 640px; height: auto; max-height: none !important; }
 .race-plot text { fill: var(--ink); font: 700 11px var(--fm); }
 .race-plot .race-axis-title { font-size: 12px; letter-spacing: .03em; }
-.race-plot .race-line-end { font-size: 12px; font-weight: 900; }
+.race-plot .race-line-end { font-size: 20px; font-weight: 900; }
 .race-axes line { stroke: #a5a59c; stroke-width: 1; }
 .race-axes .race-axis-edge { stroke: var(--ink); stroke-width: 2; }
 .race-zero-guide { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; }
@@ -68,26 +69,28 @@
 .race-position-compare label { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; }
 .race-position-compare label::before { content: ''; width: 25px; border-top: 4px solid var(--ink); }
 .race-position-compare label:nth-child(2)::before { border-color: var(--red); }
-.race-position-compare select { min-height: 40px; padding: 0 8px; border: 2px solid var(--ink); background: white; color: var(--ink); font: 700 13px var(--fm); cursor: pointer; }
+.race-position-compare select { min-height: 44px; padding: 0 8px; border: 2px solid var(--ink); background: white; color: var(--ink); font: 700 13px var(--fm); cursor: pointer; }
 .race-position-compare select:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
 .race-position-hint { flex-basis: 100%; font-size: 12px; }
 .race-compound-key i { display: block; width: 18px; height: 14px; border: 1px solid var(--ink); }
 .race-empty-chart { padding: 24px; border: 1px solid var(--ink); }
 .race-drivers { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 18px; padding: 14px; border: 2px solid var(--ink); }
 .race-drivers legend { font-size: 12px; font-weight: 700; }
-.race-drivers label { display: inline-flex; align-items: center; gap: 5px; min-height: 35px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.race-driver-actions { flex-basis: 100%; }
+.race-driver-actions .corner-switch { margin: 0; }
+.race-drivers label { display: inline-flex; align-items: center; gap: 5px; min-height: 44px; font-size: 13px; font-weight: 700; cursor: pointer; }
 .race-drivers input { width: 17px; height: 17px; accent-color: var(--ink); }
-.race-drivers label { transition: color .2s ease; }
-.race-drivers label:hover { color: var(--red); }
+.race-drivers label:hover { text-decoration: underline; text-underline-offset: .2em; }
 @media (prefers-reduced-motion: reduce) {
-  .race-tabs button, .race-drivers label { transition: none; }
+  .race-tabs button { transition: none; }
 }
 .race-calculator { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: var(--bw) solid var(--ink); }
 .race-calculator .race-range { border-right: 2px solid var(--ink); }
 .race-calculator .race-range:last-child { border-right: 0; }
 @media (max-width: 900px) {
+  .race-plot text, .race-plot .race-axis-title { font-size: 20px; }
+  .race-page .corner-title-stamp { flex-wrap: wrap; gap: 12px; }
   .race-circuit { grid-template-columns: 1fr; }
-  .race-circuit svg { max-height: 280px; }
   .race-assumptions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .race-assumptions > div { grid-column: 1 / -1; border-bottom: 2px solid var(--ink); border-right: 0; }
   .race-assumptions > :nth-child(2) { border-right: 2px solid var(--ink); }
@@ -97,7 +100,7 @@
 }
 @media (max-width: 600px) {
   .race-page .corner-title-stamp strong { font-size: 28px; }
-  .race-circuit { padding: 20px; }
+  .race-circuit { padding: 16px; }
   .race-circuit h2 { font-size: 38px; }
   .race-assumptions { grid-template-columns: 1fr; }
   .race-assumptions > div { grid-column: auto; }
@@ -106,11 +109,10 @@
   .race-tabs button { border-right: 0; border-bottom: 1px solid var(--ink); min-height: 50px; }
   .race-tabs button:last-child { border-bottom: 0; }
   .race-tabs button span { display: inline; margin-right: 12px; }
-  .race-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .race-metrics { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8em), 1fr)); }
   .race-metrics > div { min-height: 135px; padding: 12px; }
   .race-metrics strong { font-size: 36px; }
   .race-finding { font-size: 15px; padding: 15px; }
   .race-plot-scroll::before { content: 'SWIPE CHART FOR THE FULL RANGE →'; display: block; padding: 0 0 8px; font: 700 11px var(--fm); }
   .race-plot { min-width: 640px; }
-  .race-plot text, .race-plot .race-axis-title { font-size: 20px; }
 }

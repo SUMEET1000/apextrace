@@ -64,6 +64,25 @@ def test_status():
     assert body["status"] == "online"
 
 
+def test_large_json_is_gzipped_without_changing_the_payload(monkeypatch):
+    import pandas as pd
+    from api import cache
+
+    monkeypatch.setattr(cache, "load_manifest", lambda: pd.DataFrame([
+        {"year": 2024, "slug": "2024/01_R", "event_name": "Bahrain " * 1000},
+    ]))
+    monkeypatch.setattr(cache, "featured_sessions", lambda: [])
+    plain = client.get("/api/manifest", headers={"Accept-Encoding": "identity"})
+    compressed = client.get("/api/manifest", headers={"Accept-Encoding": "gzip"})
+    assert plain.status_code == compressed.status_code == 200
+    assert "content-encoding" not in plain.headers
+    assert compressed.headers["content-encoding"] == "gzip"
+    assert "Accept-Encoding" in compressed.headers["vary"]
+    assert int(compressed.headers["content-length"]) < len(plain.content)
+    assert compressed.json() == plain.json()
+    assert "content-encoding" not in client.get("/api/status").headers
+
+
 def test_manifest_keeps_every_column(manifest):
     """The previous API modelled this response and silently dropped half of it.
 

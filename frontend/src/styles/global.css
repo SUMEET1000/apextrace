@@ -33,20 +33,22 @@ body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-i
 .btn:hover > span:last-child { transform: translate(5px,-5px) scale(1.4); }
 
 /* Header: logo, section links, engine chip. */
-header { position: fixed; inset: 0 0 auto; z-index: 40; display: flex; justify-content: space-between; align-items: center; height: 56px; padding: 0 20px;
+header { position: fixed; inset: 0 0 auto; z-index: 40; display: flex; flex-wrap: wrap; row-gap: 4px; justify-content: space-between; align-items: center; align-content: center; min-height: 56px; padding: 0 20px;
   background: var(--paper); border-bottom: var(--bw) solid var(--ink); }
 header .k { font-size: 22px; }
 header nav { display: flex; gap: 26px; }
 header nav a { background: linear-gradient(var(--acc), var(--acc)) 0 100%/0 40% no-repeat; transition: background-size .35s cubic-bezier(.2,.8,.2,1); }
 header nav a:hover, header nav a[aria-current="page"] { background-size: 100% 40%; }
-.hdr-r { display: flex; gap: 14px; align-items: center; }
+.hdr-r { display: flex; gap: 14px; align-items: center; min-width: 0; max-width: 100%; }
 .eng { white-space: nowrap; }
+.hdr-r .eng { white-space: normal; overflow-wrap: anywhere; }
 .eng.live { background: var(--ink); color: var(--acc); padding: 1px 6px; }
 
 footer { padding: 20px 4vw; border-top: var(--bw) solid var(--ink); display: flex; justify-content: space-between; gap: 20px; }
 
 /* The data area of an app route starts under the fixed header. */
-.shell-main { padding-top: 56px; min-height: calc(100vh - 60px); }
+.shell-main { padding-top: var(--header-height, 56px); min-height: 100vh; }
+.pw-main { display: flow-root; }
 
 /* Shared loading, empty and error states (components/states.tsx). */
 .state { font-family: var(--fm); color: var(--ink); background: var(--paper); border: var(--bw) solid var(--ink); padding: 20px 24px; margin: 24px 4vw; max-width: 70ch; }
@@ -62,10 +64,10 @@ html { scrollbar-color: var(--ink) var(--paper); }
 
 /* Phone: the section links move to a bar along the bottom edge instead of disappearing. */
 @media (max-width: 860px) {
-  header nav { position: fixed; left: 0; right: 0; bottom: 0; height: 52px; justify-content: space-around; align-items: center; gap: 0;
+  header nav { position: fixed; left: 0; right: 0; bottom: 0; min-height: 52px; height: auto; flex-wrap: wrap; justify-content: space-around; align-items: center; gap: 0;
     background: var(--paper); border-top: var(--bw) solid var(--ink); z-index: 41; }
   header nav a { padding: 14px 8px; }
-  body { padding-bottom: 52px; }
+  body { padding-bottom: var(--bottom-nav-height, 52px); }
   header > a.k { display: flex; align-items: center; min-height: 44px; }
 }
 @media (max-width: 480px) { header { padding: 0 12px; } header .k { font-size: 17px; } .hdr-r { gap: 8px; } .hdr-r .lab { font-size: 12px; } }

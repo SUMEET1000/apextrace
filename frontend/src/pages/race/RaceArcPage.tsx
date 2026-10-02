@@ -98,7 +98,7 @@ function Range({ label, value, min, max, step, unit, help, onChange }: { label: 
 function Table({ rows, columns }: { rows: object[];
   columns: { key: string; label: string; format?: (value: unknown) => string }[] }) {
   if (!rows.length) return <p>No rows are available for this session.</p>;
-  return <details className="corner-table-details" open={!window.matchMedia('(max-width: 600px)').matches}>
+  return <details className="corner-table-details">
     <summary>Exact values · {rows.length} rows</summary><div className="corner-table-wrap"><table>
       <thead><tr>{columns.map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead>
       <tbody>{rows.map((item, index) => {
@@ -239,7 +239,7 @@ export function RaceArcPage({ sessions, years, openerSlug }: { sessions: Manifes
       <p>Measure tyre wear, the track itself, and the cost of a strategy call from recorded laps.</p></div>
       <div className="corner-title-stamp"><span>02 / 02</span><strong>RACE<br />ARC</strong><span>{choice.slug}</span></div>
     </div>
-    <div className="corner-picker" aria-label="Choose session">
+    <div className="corner-picker" role="group" aria-label="Choose session">
       <label>SEASON<select value={year} onChange={(event) => update({ year: event.target.value, round: null, session: null })}>
         {years.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       <label>EVENT<select value={round} onChange={(event) => update({ round: event.target.value, session: null })}>
@@ -466,6 +466,10 @@ function GapChart({ slug, drivers }: { slug: string; drivers: string[] }) {
   const [chosen, setChosen] = useState(() => drivers.slice(0, 5));
   const selected = chosen.filter((driver) => drivers.includes(driver));
   return <><fieldset className="race-drivers"><legend>DRIVERS TO COMPARE · {selected.length} SELECTED</legend>
+    <div className="race-driver-actions"><div className="corner-switch" role="group" aria-label="Driver selection">
+      <button type="button" onClick={() => setChosen(drivers)}>ALL</button>
+      <button type="button" onClick={() => setChosen([])}>CLEAR</button>
+    </div></div>
     {drivers.map((driver) => <label key={driver}><input type="checkbox" checked={selected.includes(driver)}
       onChange={(event) => setChosen((current) => event.target.checked
         ? [...current, driver] : current.filter((name) => name !== driver))} />{driver}</label>)}

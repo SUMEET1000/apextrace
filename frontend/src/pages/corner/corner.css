@@ -1,7 +1,7 @@
 .corner-page { --sector-1: #3DAE5B; --sector-2: #E66A22; --sector-3: #493D97; --driver-a: #131313; --driver-b: #fff; color: var(--ink); background: var(--paper); min-height: 100vh; padding: 0 4vw 7vw; font-family: var(--fm); }
 .corner-page .k { font-family: var(--fd); font-style: normal; letter-spacing: -.055em; }
 .corner-page .lab { font-size: 13px; }
-.corner-progress { position: fixed; top: 56px; left: 0; right: 0; height: 5px; z-index: 55; background: #1313131f; transition: height .25s; }
+.corner-progress { position: fixed; top: var(--header-height, 56px); left: 0; right: 0; height: 5px; z-index: 55; background: #1313131f; transition: height .25s; }
 .corner-progress i { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--acc); box-shadow: 2px 0 0 var(--ink); }
 .corner-progress u { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); text-decoration: none; }
 .corner-progress u b { position: absolute; top: 100%; left: 4px; margin-top: 4px; padding: 1px 4px; background: var(--paper); font: 500 12px var(--fm); letter-spacing: .04em; white-space: nowrap; opacity: 0; transition: opacity .2s; }
@@ -188,8 +188,8 @@
   .corner-map-scale { grid-template-columns: 1fr; }
   .corner-trace-row { grid-template-columns: 75px minmax(0, 1fr); }
   .corner-trace-row > span { font-size: 11px; }
-  .corner-bar { grid-template-columns: 80px minmax(120px, 1fr) 70px; font-size: 11px; }
-  .corner-bar-axis { grid-template-columns: 80px minmax(120px, 1fr) 70px; font-size: 10px; }
+  .corner-bar { grid-template-columns: 80px minmax(0, 1fr) 70px; font-size: 11px; }
+  .corner-bar-axis { grid-template-columns: 80px minmax(0, 1fr) 70px; font-size: 10px; }
   .corner-bar-axis strong, .corner-bar-scale { font-size: 10px; }
   .corner-table-wrap { max-height: none; overflow-y: visible; }
   .corner-replay-top { display: block; }

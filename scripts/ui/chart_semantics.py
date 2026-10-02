@@ -127,6 +127,16 @@ def check_race(gate: Gate, browser, base: str, width: int) -> None:
             page.locator(f'[data-chart="{chart}"]').wait_for(state="visible", timeout=60_000)
         shown = page.locator('[data-chart]').evaluate_all("nodes => nodes.map(n => n.dataset.chart)")
         gate.check(shown == ids, f"{width}: {view} renders its complete chart set", shown)
+        page.locator('.corner-picker').scroll_into_view_if_needed()
+        page.locator('.corner-picker').wait_for(state='visible')
+        gate.check(page.get_by_role('group', name='Choose session', exact=True).count() == 1,
+                   f"{width}: session picker exposes its named group")
+        controls = page.locator('.race-range input').evaluate_all('nodes => nodes.map(e => e.getBoundingClientRect().height)')
+        gate.check(all(height >= 44 for height in controls), f"{width}: range controls have 44 px touch targets", controls)
+        if width <= 900:
+            fonts = page.locator('.race-plot text').evaluate_all('nodes => nodes.map(e => getComputedStyle(e).fontSize)')
+            gate.check(fonts and all(font == '20px' for font in fonts),
+                       f"{width}: compact chart labels use the readable 20-unit scale")
         progress = page.locator('.corner-progress')
         before = progress.evaluate("e => getComputedStyle(e).height")
         labels = progress.locator('b').all_text_contents()
@@ -174,6 +184,9 @@ def check_race(gate: Gate, browser, base: str, width: int) -> None:
                        and bar_colours == list(compound_colours.values()),
                        f"{width}: every tyre dot reaches 3:1 contrast and matches its degradation bar", marks)
         elif view == "Track%20Evolution":
+            summary = page.locator('.race-method summary')
+            gate.check(summary.evaluate('e => e.getBoundingClientRect().height') >= 44,
+                       f"{width}: method disclosure has a 44 px target")
             model = page.locator('[data-chart="evolution-curve"] svg.race-plot > path:not(.race-interval)').first.get_attribute('d') or ''
             bands = page.locator('[data-chart="evolution-curve"] .race-interval').count()
             temperature = page.locator('[data-chart="evolution-temperature"] .race-panel svg').count()
@@ -195,6 +208,14 @@ def check_race(gate: Gate, browser, base: str, width: int) -> None:
             pos = position.locator('svg.race-plot > path[stroke="#131313"]').get_attribute('d') or ''
             ranks = position.locator('.race-axes g text').all_text_contents()
             labels = position.locator('.race-line-end').all_text_contents()
+            label_styles = position.locator('.race-line-end').evaluate_all("""nodes => nodes.map(e => {
+                const svg = e.closest('svg'), style = getComputedStyle(e);
+                return {colour: style.fill, units: parseFloat(style.fontSize),
+                    pixels: parseFloat(style.fontSize) * svg.getBoundingClientRect().width / svg.viewBox.baseVal.width};
+            })""")
+            gate.check(len(label_styles) == 2 and all(style['colour'] == 'rgb(19, 19, 19)'
+                       and style['units'] == 20 and style['pixels'] >= 14 for style in label_styles),
+                       f"{width}: comparison end labels use readable ink text", label_styles)
             undercut = page.locator('[data-chart="undercut-chart"] svg.race-plot > path').count()
             coords = [float(part.split(',')[1]) for part in pos.replace('M', 'L').split('L') if ',' in part]
             gate.check(stints == 6 and median == 1 and gap.count('M') == 2
@@ -233,9 +254,19 @@ def check_race(gate: Gate, browser, base: str, width: int) -> None:
     live.goto(base.rstrip('/') + "/race-arc?year=2024&round=1&session=R&view=Race%20Strategy",
               wait_until="domcontentloaded")
     live.locator('[data-chart="gap-chart"]').wait_for(state="visible", timeout=60_000)
+    table = live.locator('.corner-table-details').first
+    gate.check(not table.evaluate('e => e.open'), f"{width}: exact-value table starts collapsed")
+    table.locator('summary').press('Enter')
+    gate.check(table.evaluate('e => e.open') and table.locator('tbody tr').count() == 20,
+               f"{width}: keyboard opens all 20 exact-value rows")
+    table.locator('summary').press('Enter')
     checkboxes = live.locator('.race-drivers input')
-    for checkbox in checkboxes.all():
-        checkbox.check()
+    driver_label = live.locator('.race-drivers label').first
+    driver_label.hover()
+    gate.check(driver_label.evaluate('e => getComputedStyle(e).color') == 'rgb(19, 19, 19)'
+               and driver_label.evaluate('e => getComputedStyle(e).textDecorationLine') == 'underline',
+               f"{width}: driver hover keeps ink text and adds an underline")
+    live.locator('.race-driver-actions').get_by_role('button', name='ALL', exact=True).press('Enter')
     live.wait_for_function("document.querySelectorAll('[data-chart=\"gap-chart\"] svg.race-plot > path').length === 20")
     gate.check(checkboxes.count() == 20 and live.locator('.race-drivers input:checked').count() == 20
                and live.locator('[data-chart="gap-chart"] svg.race-plot > path').count() == 20,
@@ -253,6 +284,15 @@ def check_race(gate: Gate, browser, base: str, width: int) -> None:
         if chart == 'position-chart':
             gate.check(all(stroke[1] is None for stroke in strokes),
                        f"{width}: all-driver position lines are solid")
+    live.locator('.race-driver-actions').get_by_role('button', name='CLEAR', exact=True).press('Enter')
+    live.locator('[data-chart="gap-chart"] .race-empty-chart').wait_for(state='visible')
+    gate.check(live.locator('.race-drivers input:checked').count() == 0
+               and live.locator('[data-chart="gap-chart"] svg.race-plot > path').count() == 0,
+               f"{width}: clear removes every selection and gap line")
+    checkboxes.first.check()
+    live.wait_for_function("document.querySelectorAll('[data-chart=\"gap-chart\"] svg.race-plot > path').length === 1")
+    gate.check(live.locator('.race-drivers input:checked').count() == 1,
+               f"{width}: individual selection works after clear")
     live.close()
     for year, round_, event in ((2026, 6, 'Monaco'), (2024, 2, 'Jeddah')):
         circuit = browser.new_page(viewport=viewport(width), reduced_motion='reduce')
@@ -280,6 +320,125 @@ def check_race(gate: Gate, browser, base: str, width: int) -> None:
         circuit.close()
 
 
+def check_race_text_scaling(gate: Gate, browser, base: str, width: int) -> None:
+    for view in ('Tyre%20Degradation', 'Track%20Evolution', 'Race%20Strategy'):
+        page = browser.new_page(viewport=viewport(width), reduced_motion='reduce')
+        errors = watch_errors(page)
+        page.goto(base.rstrip('/') + '/race-arc?year=2024&round=1&session=R&view=' + view)
+        page.wait_for_function("document.querySelector('[data-slug]')&&!document.querySelector('[aria-busy=\"true\"]')")
+        page.wait_for_load_state('networkidle')
+        page.evaluate("""() => {
+            const nodes = [...document.querySelectorAll('body, body *')].filter(e => !(e instanceof SVGElement));
+            const sizes = nodes.map(e => parseFloat(getComputedStyle(e).fontSize));
+            nodes.forEach((e, i) => e.style.setProperty('font-size', sizes[i] * 2 + 'px', 'important'));
+        }""")
+        page.wait_for_timeout(350)
+        result = page.evaluate("""() => {
+            const overhang = [], metrics = [], walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+            let node;
+            while (node = walker.nextNode()) {
+                const e = node.parentElement;
+                if (!node.textContent.trim() || e.closest('svg,.sr,.race-plot-scroll,.corner-table-wrap,.race-method code,script,style,.corner-progress')) continue;
+                if (!e.checkVisibility({checkVisibilityCSS: true, checkOpacity: true})) continue;
+                const range = document.createRange(); range.selectNodeContents(node);
+                const rects = [...range.getClientRects()];
+                if (rects.some(r => r.width > 0 && (r.left < -1 || r.right > innerWidth + 1))) overhang.push(node.textContent.trim());
+                const cell = e.closest('.race-metrics > div');
+                if (cell) {
+                    const box = cell.getBoundingClientRect();
+                    if (rects.some(r => r.width > 0 && (r.left < box.left - 1 || r.right > box.right + 1))) metrics.push(node.textContent.trim());
+                }
+            }
+            return {overflow: document.documentElement.scrollWidth - innerWidth, overhang, metrics,
+                header: document.querySelector('header').getBoundingClientRect().height,
+                offset: parseFloat(getComputedStyle(document.querySelector('main')).paddingTop)};
+        }""")
+        gate.check(result['overflow'] <= 1 and not result['overhang'] and not result['metrics']
+                   and abs(result['header'] - result['offset']) <= 1 and not errors,
+                   f"{width}: {view} supports 200% HTML text without clipping or metric overlap", result)
+        page.close()
+
+
+def check_lap_verdict(gate: Gate, browser, base: str, width: int) -> None:
+    cases = [
+        ('RUS,VER', 90, 90.5, 'RUSSELL IS 0.500 S FASTER'),
+        ('RUS,VER', 90.5, 90, 'VERSTAPPEN IS 0.500 S FASTER'),
+        ('RUS,VER', 90, 90, 'SAME LAP TIME'),
+        ('RUS,VER', None, 90, 'FULL LAP TIMES UNAVAILABLE'),
+        ('RUS,RUS', 90.5, 90, 'RUSSELL IS 0.500 S FASTER'),
+    ]
+    for drivers, time_a, time_b, expected in cases:
+        page = browser.new_page(viewport=viewport(width), reduced_motion='reduce')
+        errors = watch_errors(page)
+
+        def fixture(route):
+            body = route.fetch().json()
+            body.update(time_a=time_a, time_b=time_b, lap_a=1, lap_b=2,
+                        gap=None if time_a is None else time_b - time_a)
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+        page.route('**/api/corner-analysis?*', fixture)
+        page.goto(base.rstrip('/') + f'/corner-analysis?year=2024&round=12&session=Q&drivers={drivers}')
+        verdict = page.locator('.corner-verdict')
+        title = ' '.join(verdict.locator('h2').inner_text(timeout=60_000).upper().split())
+        explanation = verdict.locator('p').first.inner_text()
+        gate.check(expected in title and (
+            'recorded time for both laps' in explanation if time_a is None else
+            'selected lap times, not race positions' in explanation)
+            and page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+            and not errors,
+            f'{width}: lap verdict identifies the faster lap or unavailable/equal times', title)
+        page.close()
+
+
+def check_lap_availability(gate: Gate, browser, base: str, width: int) -> None:
+    cases = [
+        ('R', [
+            ('deleted lap', 'Cancelled lap times', 'timing feed'),
+            ('no lap time recorded (retired or incomplete lap)', 'No recorded lap time', 'can happen'),
+            ('telemetry missing or unusable in the source feed', 'Car data unavailable or unusable', 'Source car data'),
+            *[(f'{kind} (below the 25% track-coverage floor)', title, 'at least 25%')
+              for kind, title in (('in-lap', 'Pit-entry laps'), ('out-lap', 'Pit-exit laps'),
+                                  ('lap 1 from the grid', 'Opening laps'))],
+            ('in-lap (unknown source flag)', 'in-lap (unknown source flag)', 'do not identify a more precise cause'),
+            ('Unknown source flag', 'Unknown source flag', 'do not identify a more precise cause'),
+        ]),
+        ('Q', [
+            ('not among the fastest laps kept for this session type', 'Outside the selected fastest laps', 'by design'),
+            *[(f'{kind} (not stored for this session type)', title, 'selected complete laps')
+              for kind, title in (('in-lap', 'Pit-entry laps'), ('out-lap', 'Pit-exit laps'),
+                                  ('lap 1 from the grid', 'Opening laps'))],
+        ]),
+    ]
+    for session, reasons in cases:
+        page = browser.new_page(viewport=viewport(width), reduced_motion='reduce')
+        errors = watch_errors(page)
+
+        def fixture(route):
+            body = route.fetch().json()
+            stored = body['availability']['summary']['n_stored']
+            body['availability'] = dict(
+                summary=dict(n_stored=stored, n_laps=stored + len(reasons),
+                             n_missing=len(reasons), coverage=stored / (stored + len(reasons)),
+                             stores_all_laps=session == 'R'),
+                reasons=[dict(reason=reason, count=1) for reason, _, _ in reasons])
+            route.fulfill(status=200, content_type='application/json', body=json.dumps(body))
+
+        page.route('**/api/session?*', fixture)
+        page.goto(base.rstrip('/') + f'/corner-analysis?year=2024&round=1&session={session}')
+        disclosure = page.locator('.corner-availability')
+        disclosure.locator('summary').click()
+        rows = disclosure.locator('p').all_text_contents()[2:]
+        gate.check(len(rows) == len(reasons) and all(
+            f'{title}: 1 lap' in text and '1 laps' not in text and explanation in text
+            for text, (_, title, explanation) in zip(rows, reasons)),
+            f'{width}: {session} availability explains every exclusion category', rows)
+        gate.check(page.evaluate('document.documentElement.scrollWidth <= innerWidth + 1')
+                   and not errors,
+                   f'{width}: expanded {session} availability fits without browser errors', errors)
+        page.close()
+
+
 def main() -> None:
     args = parse(__doc__, widths=(1440, 390),
                  extra=lambda p: p.add_argument("--seed-defect", action="store_true"))
@@ -288,6 +447,8 @@ def main() -> None:
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
         for width in args.widths:
+            check_lap_verdict(gate, browser, args.base, width)
+            check_lap_availability(gate, browser, args.base, width)
             page = browser.new_page(viewport=viewport(width))
             errors = watch_errors(page)
 
@@ -564,6 +725,7 @@ def main() -> None:
                        f"{width}: reduced motion shows complete segment bars immediately")
             reduced.close()
             check_race(gate, browser, args.base, width)
+            check_race_text_scaling(gate, browser, args.base, width)
         browser.close()
     gate.exit()
 

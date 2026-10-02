@@ -17,6 +17,34 @@ gsap.registerPlugin(ScrollTrigger);
 
 type Choice = { slug: string; meta: ManifestSession };
 
+type AvailabilityCopy = { title: string; description: string };
+
+const AVAILABILITY_NOTES: Record<string, AvailabilityCopy> = {
+  'deleted lap': { title: 'Cancelled lap times', description: 'The timing feed marks these lap times as cancelled. They are left out of this comparison so a cancelled time is not treated as a valid timed lap.' },
+  'no lap time recorded (retired or incomplete lap)': { title: 'No recorded lap time', description: 'No lap time was recorded, so there is no completed time to compare. This can happen when a lap is unfinished or a driver retires.' },
+  'telemetry missing or unusable in the source feed': { title: 'Car data unavailable or unusable', description: 'Source car data was missing or could not be used for these laps. Without usable speed, throttle and braking readings, a corner comparison would be unreliable.' },
+  'not among the fastest laps kept for this session type': { title: 'Outside the selected fastest laps', description: "For this session, ApexTrace compares a limited set of each driver's fastest laps. Other laps are left out by design to keep the dataset smaller." },
+};
+
+const PARTIAL_LAP_NOTES: Record<string, AvailabilityCopy> = {
+  'in-lap': { title: 'Pit-entry laps', description: 'The driver enters the pit lane during these laps, so only the part driven on the circuit can be compared.' },
+  'out-lap': { title: 'Pit-exit laps', description: 'The driver leaves the pit lane during these laps, so the car data may cover only part of the circuit.' },
+  'lap 1 from the grid': { title: 'Opening laps', description: 'An opening lap can have a shorter car-data trace, particularly when it starts from the grid.' },
+};
+
+function availabilityCopy(reason: string): AvailabilityCopy {
+  if (AVAILABILITY_NOTES[reason]) return AVAILABILITY_NOTES[reason];
+  const partial = PARTIAL_LAP_NOTES[reason.split(' (')[0]];
+  if (partial && /\((?:below the \d+% track-coverage floor|not stored for this session type)\)$/.test(reason)) {
+    const floor = reason.match(/below the (\d+%) track-coverage floor/);
+    const rule = floor
+      ? `Partial laps need usable readings over at least ${floor[1]} of the circuit. These laps have no usable trace for this comparison.`
+      : 'This session compares selected complete laps, so these partial laps are left out by design.';
+    return { title: partial.title, description: `${partial.description} ${rule}` };
+  }
+  return { title: reason, description: 'There is no usable car data for these laps in this comparison. The available records do not identify a more precise cause.' };
+}
+
 function driverLabel(data: SessionResponse, code: string): string {
   const name = data.results.find((row) => row.Abbreviation === code)?.FullName;
   return typeof name === 'string' && name ? `${name} (${code})` : code;
@@ -219,9 +247,12 @@ function SessionDetail({ choice }: { choice: Choice }) {
     {data.session_label.toLowerCase().includes('qualifying') && <p className="corner-definition"><Term id="qualifying" /></p>}
     {data.is_race && compounds.length > 0 && <p className="corner-definition"><Term id="compound" /></p>}
     {data.availability.summary.n_laps > 0 && <details className="corner-availability"><summary>Lap availability · {data.availability.summary.n_stored} of {data.availability.summary.n_laps} selectable</summary>
-      <p>Only laps with stored car data can be compared. {data.availability.summary.stores_all_laps && data.availability.summary.coverage < .9
-        ? 'Some telemetry is missing or unusable in the source feed.' : 'The session list reflects the laps this tool stores.'}</p>
-      {data.availability.reasons.map((row) => <p key={row.reason}>{row.reason}: {row.count} laps</p>)}
+      <p>Corner comparisons need car data such as speed, throttle and braking. You can compare {data.availability.summary.n_stored} of this session's {data.availability.summary.n_laps} recorded laps.</p>
+      {data.availability.summary.n_missing > 0 && <p>The other {data.availability.summary.n_missing} {data.availability.summary.n_missing === 1 ? 'lap is' : 'laps are'} left out for the reasons below. Each lap is counted once.</p>}
+      {data.availability.reasons.map((row) => {
+        const copy = availabilityCopy(row.reason);
+        return <p key={row.reason}><strong>{copy.title}: {row.count} {row.count === 1 ? 'lap' : 'laps'}</strong><br />{copy.description}</p>;
+      })}
     </details>}
     {lapA === null || lapB === null
       ? <Empty>Nothing to show for this tyre selection: one driver has no stored lap.</Empty>
@@ -280,16 +311,16 @@ function Comparison({ data, meta, nameA, nameB, lapA, lapB }: { data: SessionRes
   const selected = view === 'delta' ? map.data : view === 'a' ? speedA.data : speedB.data;
   const projected = project(data.trackmap, 400, 260, 20);
   const gap = result.gap;
-  const faster = gap === null ? null : nameA === nameB ? (gap > 0 ? result.display_a : result.display_b)
-    : driverSurname(data, gap > 0 ? nameA : nameB);
+  const faster = gap === null ? null : driverSurname(data, gap > 0 ? nameA : nameB);
   const partial = (result.summary.coverage ?? 1) < .999;
   const showTables = !window.matchMedia('(max-width: 600px)').matches;
   return <div className="corner-comparison" ref={content}>
     <div className="corner-verdict">
       <div><span className="lab">THE ANSWER / {meta.event_name.toUpperCase()}</span>
-        <h2 className="k">{gap === null ? 'NO LAP GAP' : <>{faster} GAINS <ScrollNumber value={Math.abs(gap)} format={(value) => `${value.toFixed(3)} S`} /></>}</h2>
-        <p>{gap === null ? 'One lap has no recorded total. The comparable segments still show where time changed hands.'
-          : `Reference: ${driverLabel(data, nameA)} lap ${result.lap_a}. Compare: ${driverLabel(data, nameB)} lap ${result.lap_b}.`}</p>
+        <h2 className="k">{gap === null ? 'FULL LAP TIMES UNAVAILABLE' : gap === 0 ? 'SAME LAP TIME'
+          : <>{faster} IS <ScrollNumber value={Math.abs(gap)} format={(value) => `${value.toFixed(3)} S FASTER`} /></>}</h2>
+        <p>{gap === null ? 'A full-lap comparison needs a recorded time for both laps. You can still compare the segments with car data.'
+          : `Reference: ${driverLabel(data, nameA)} lap ${result.lap_a}. Compare: ${driverLabel(data, nameB)} lap ${result.lap_b}. This compares the selected lap times, not race positions.`}</p>
         <p><b>{fmtDelta(result.summary.corner_delta_s)}</b> in corners · <b>{fmtDelta(result.summary.straight_delta_s)}</b> on straights.</p>
       </div>
       <div className="corner-verdict-circuit">

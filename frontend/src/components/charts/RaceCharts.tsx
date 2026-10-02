@@ -145,7 +145,7 @@ function Plot({ lines, xUnit, yUnit, height = 300, reverseY = false, dots = [], 
         ? index : found, -1);
       if (last < 0 || !Number.isFinite(line.x[last])) return null;
       return <text key={line.label} x={x(line.x[last]) + 6} y={y(line.y[last] as number) + 4}
-        className="race-line-end" style={{ fill: line.colour ?? INK }}>{line.label}</text>;
+        className="race-line-end">{line.label}</text>;
     })}
     {dots.flatMap((line, row) => line.x.map((value, index) => {
       const sample = line.y[index];
@@ -384,7 +384,7 @@ export function RaceChart({ id, params, title }: { id: ChartId;
   if (!state.data) return <Loading what={title.toLowerCase()} />;
   const withSeries = state.data as Base & { series?: Series[] };
   const finding = /\d/.test(state.data.finding) ? state.data.finding
-    : `${state.data.finding} ${withSeries.series?.length ?? 0} driver series shown.`;
+    : `${state.data.finding} ${withSeries.series?.length ?? 0} driver series available.`;
   return <figure className="corner-chart race-chart" aria-labelledby={chartId} ref={frame}>
     <figcaption id={chartId}><span className="race-chart-title">{title}</span>
       <span data-finding>{finding}</span><p className="race-chart-explain">{CHART_GUIDES[id]}</p></figcaption>

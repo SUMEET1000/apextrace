@@ -63,7 +63,7 @@ export function boot(root, F) {
   function sheetTrack(svg, o = {}) {
     const W = TW, T = TRACK, ink = '#131313';
     svg.innerHTML = `<defs><pattern id="dt" width="9" height="9" patternUnits="userSpaceOnUse"><circle cx="4.5" cy="4.5" r="2.4" fill="${ink}"/></pattern></defs>
-<circle cx="${T.w / 2}" cy="${T.h / 2}" r="${T.h * .6}" fill="none" stroke="${ink}" stroke-width="1.2"/><circle cx="${T.w / 2}" cy="${T.h / 2}" r="8" fill="${ink}"/>`;
+<circle cx="${T.w / 2}" cy="${T.h / 2}" r="${T.h * .6}" fill="none" stroke="${ink}" stroke-width="1.2"/>`;
     let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     F.faster.b_top.map((n, i) => [n, [86, 66, 60][i]]).forEach(([n, R]) => {
       const c = T.corners[n - 1], g = el('g');
@@ -233,11 +233,11 @@ export function boot(root, F) {
     gsap.ticker.add(raf); gsap.ticker.lagSmoothing(0);
     undo.push(() => { gsap.ticker.remove(raf); gsap.ticker.lagSmoothing(500, 33); lenis.destroy(); lenis = null; });
     // In-page links glide through Lenis instead of jumping; the offset keeps the section clear of
-    // the 56 px fixed header.
+    // the fixed header.
     D.querySelectorAll('a[href^="#"]').forEach(a => on(a, 'click', e => {
       const id = a.getAttribute('href').slice(1), t = id ? D.getElementById(id) : 0;
       if (t === null || !lenis) return;
-      e.preventDefault(); lenis.scrollTo(t, { offset: t ? -56 : 0, duration: 1.4 });
+      e.preventDefault(); lenis.scrollTo(t, { offset: t ? -D.querySelector('header').getBoundingClientRect().height : 0, duration: 1.4 });
     }));
 
     ctx.add(() => {
@@ -312,7 +312,7 @@ export function boot(root, F) {
     // Ticks come from the live layout, so the pinned counter's spacer is counted; they are placed
     // again later and on resize because ScrollTrigger adds that spacer late.
     function place() {
-      bar.style.top = D.querySelector('header').getBoundingClientRect().bottom + 'px';
+      bar.style.top = 'var(--header-height, 56px)';
       bar.querySelectorAll('u').forEach(u => u.remove());
       const max = D.documentElement.scrollHeight - innerHeight;
       S.forEach(([id, name]) => { const e = D.getElementById(id); if (!e) return; const u = D.createElement('u'); u.style.left = (e.getBoundingClientRect().top + scrollY) / max * 100 + '%'; u.innerHTML = '<b>' + name + '</b>'; bar.append(u); });
